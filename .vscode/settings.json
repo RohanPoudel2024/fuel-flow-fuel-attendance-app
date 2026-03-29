@@ -3,5 +3,9 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  // Disable the react-native-text-watcher extension's lint rules for this
+  // React Native project. The extension incorrectly flags color string
+  // literals inside ternary expressions as "must be rendered within <Text>".
+  "reactNativeTextWatcher.enable": false
 }
