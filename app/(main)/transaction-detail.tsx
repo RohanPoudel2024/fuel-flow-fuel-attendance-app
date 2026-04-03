@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import {
 import { historyService } from "../../services/history.service";
 import { getUnitPrice } from "../../services/price.util";
 import { useTheme } from "../../context/theme-context";
+import { authService, type StationUser } from "../../services/auth.service";
+import { API_URL } from "../../config/api.config";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -40,6 +42,35 @@ export default function TransactionDetailScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<"fill" | "verify" | null>(null);
   const staffId = params.staffId ?? "";
+  const [activePrice, setActivePrice] = useState<number>(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStationPrices = async () => {
+      try {
+        const u = await authService.getUser();
+        if (!u?.station?.id) return;
+        const token = await authService.getToken();
+        const res = await fetch(`${API_URL}/station/${u.station.id}/fuel-prices`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const prices = await res.json();
+          const p = prices.find((item: any) => item.fuelType === transaction.fuelType);
+          if (p && p.pricePerUnit && isMounted) {
+            setActivePrice(Number(p.pricePerUnit));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch station prices:", err);
+      }
+    };
+
+    if (getUnitPrice(transaction) === 0) {
+      void fetchStationPrices();
+    }
+    return () => { isMounted = false; };
+  }, [transaction.fuelType]);
 
   const doMarkFilled = async () => {
     try {
@@ -106,7 +137,13 @@ export default function TransactionDetailScreen() {
   const fuelTypeColor =
     transaction.fuelType === "PETROL" ? theme.success : theme.accent;
 
-  const unitPrice = getUnitPrice(transaction);
+  const baseUnitPrice = getUnitPrice(transaction);
+  const finalUnitPrice = baseUnitPrice > 0 ? baseUnitPrice : activePrice;
+
+  // Real-time calculation if not fully synced
+  const calcTotalAmount = transaction.totalAmount && transaction.totalAmount > 0 
+    ? transaction.totalAmount 
+    : (transaction.quantity ?? 0) * finalUnitPrice;
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "—";
@@ -165,71 +202,57 @@ export default function TransactionDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Card */}
-        <View
-          style={[
-            styles.statusCard,
-            {
-              backgroundColor: statusInfo.bg,
-              borderColor: statusInfo.color + "40",
-            },
-          ]}
-        >
-          <MaterialCommunityIcons name={statusInfo.icon} size={32} color={statusInfo.color} />
-          <View>
-            <Text style={[styles.statusLabel, { color: statusInfo.color }]}>{statusInfo.label}</Text>
-            <Text style={[styles.statusDesc, { color: theme.text }]}>Fuel Fill Status</Text>
+        {/* Main Hero: Amount & Fuel Type */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroFuelType}>
+            <MaterialCommunityIcons name={transaction.fuelType === "PETROL" ? "leaf" : "fire"} size={24} color={fuelTypeColor} />
+            <Text style={[styles.heroFuelLabel, { color: fuelTypeColor }]}>{transaction.fuelType ?? "—"}</Text>
           </View>
+          <Text style={[styles.heroAmount, { color: theme.text }]}>
+            Rs. {calcTotalAmount?.toFixed(2) ?? "0.00"}
+          </Text>
+          <Text style={[styles.heroQty, { color: theme.subText }]}>
+            {transaction.quantity?.toFixed(2) ?? "0.00"} Liters @ Rs. {Number(finalUnitPrice).toFixed(2)}/L
+          </Text>
         </View>
 
-        {/* Fuel Info */}
-        <View style={[styles.fuelCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <View style={[styles.fuelIconWrap, { backgroundColor: theme.bg }]}>
-            <MaterialCommunityIcons name="fuel" size={28} color={fuelTypeColor} />
-          </View>
-          <View style={styles.fuelInfo}>
-            <Text style={[styles.fuelType, { color: fuelTypeColor }]}>
-              {transaction.fuelType ?? "—"}
-            </Text>
-            <Text style={[styles.fuelQty, { color: theme.subText }]}>
-              {transaction.quantity?.toFixed(2) ?? "0.00"} Liters
-            </Text>
-          </View>
-          <View style={styles.fuelAmount}>
-            <Text style={[styles.amountLabel, { color: theme.subText }]}>Total</Text>
-            <Text style={[styles.amountValue, { color: theme.text }]}>
-              Rs. {transaction.totalAmount?.toFixed(2) ?? "0.00"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Details Card */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: theme.subText }]}>Transaction Info</Text>
+        {/* Seamless Details List */}
+        <View style={styles.detailsList}>
+          <Text style={[styles.listSectionTitle, { color: theme.subText }]}>TRANSACTION DETAILS</Text>
+          
           <Row icon="identifier" label="Transaction No" value={transaction.transactionNo ?? "—"} />
-          <Row icon="currency-inr" label="Price/Liter" value={`Rs. ${Number(unitPrice).toFixed(2) ?? "0.00"}`} />
+          <Row icon="currency-inr" label="Price/Liter" value={`Rs. ${Number(finalUnitPrice).toFixed(2) ?? "0.00"}`} />
+          <Row icon="calendar-outline" label="Date & Time" value={formatDate(transaction.createdAt)} />
           <Row icon="check-circle-outline" label="Payment Status" value={transaction.status ?? "—"} valueColor={theme.success} />
-          <Row icon="calendar-outline" label="Date" value={formatDate(transaction.createdAt)} />
+          
+          <View style={[styles.statusRow, { borderBottomColor: theme.bg }]}>
+            <View style={styles.rowLeft}>
+              <MaterialCommunityIcons name="gas-station-outline" size={16} color={theme.subText} />
+              <Text style={[styles.rowLabel, { color: theme.subText }]}>Fill Status</Text>
+            </View>
+            <View style={[styles.badgeInline, { backgroundColor: statusInfo.bg, borderColor: statusInfo.color + "40" }]}>
+              <MaterialCommunityIcons name={statusInfo.icon} size={12} color={statusInfo.color} />
+              <Text style={[styles.badgeInlineText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
+            </View>
+          </View>
+
+          {transaction.customer && (
+            <>
+              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>CUSTOMER INFO</Text>
+              <Row icon="account-outline" label="Name" value={transaction.customer.name ?? "—"} />
+              {transaction.customer.phone && (
+                <Row icon="phone-outline" label="Phone" value={transaction.customer.phone} />
+              )}
+            </>
+          )}
+
+          {transaction.notes && (
+            <>
+              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>NOTES</Text>
+              <Text style={[styles.notesText, { color: theme.text }]}>{transaction.notes}</Text>
+            </>
+          )}
         </View>
-
-        {/* Customer Card */}
-        {transaction.customer && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Customer</Text>
-            <Row icon="account-outline" label="Name" value={transaction.customer.name ?? "—"} />
-            {transaction.customer.phone && (
-              <Row icon="phone-outline" label="Phone" value={transaction.customer.phone} />
-            )}
-          </View>
-        )}
-
-        {/* Notes */}
-        {transaction.notes && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Notes</Text>
-            <Text style={[styles.notesText, { color: theme.subText }]}>{transaction.notes}</Text>
-          </View>
-        )}
 
         {/* Error Banner */}
         {errorMsg && (
@@ -302,12 +325,12 @@ export default function TransactionDetailScreen() {
           )}
 
           <TouchableOpacity
-            style={[styles.actionBtn, styles.scanAgainBtn, { borderColor: theme.accent }]}
+            style={[styles.actionBtn, styles.scanAgainBtn, { borderColor: theme.primary }]}
             onPress={() => router.replace("/(main)/scan")}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="qrcode-scan" size={20} color={theme.accent} />
-            <Text style={[styles.actionBtnText, { color: theme.accent }]}>Scan Another</Text>
+            <MaterialCommunityIcons name="qrcode-scan" size={20} color={theme.primary} />
+            <Text style={[styles.actionBtnText, { color: theme.primary }]}>Scan Another</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -348,84 +371,89 @@ const styles = StyleSheet.create({
   },
   headerSub: { fontSize: 12, textAlign: "center" },
 
-  /* status */
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-  },
-  statusLabel: { fontSize: 18, fontWeight: "700" },
-  statusDesc: { fontSize: 12, marginTop: 2, opacity: 0.8 },
-
-  /* fuel */
-  fuelCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  fuelIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+  /* Main Hero */
+  heroSection: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 28,
+    marginBottom: 8,
   },
-  fuelInfo: { flex: 1 },
-  fuelType: { fontSize: 17, fontWeight: "700" },
-  fuelQty: { fontSize: 13, marginTop: 2 },
-  fuelAmount: { alignItems: "flex-end" },
-  amountLabel: { fontSize: 11 },
-  amountValue: { fontSize: 18, fontWeight: "700" },
-
-  /* card */
-  card: {
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    gap: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+  heroFuelType: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 13,
+  heroFuelLabel: {
+    fontSize: 16,
     fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  heroAmount: {
+    fontSize: 42,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  heroQty: {
+    fontSize: 15,
+    fontWeight: "500",
   },
 
-  /* row */
+  /* Details List */
+  detailsList: {
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  listSectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 16,
+    marginLeft: 4,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
   },
-  rowLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rowLabel: { fontSize: 13 },
-  rowValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    maxWidth: "55%",
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
   },
-
-  /* notes */
-  notesText: { fontSize: 14, lineHeight: 20 },
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rowLabel: { fontSize: 14, fontWeight: "500" },
+  rowValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    maxWidth: "50%",
+    textAlign: "right",
+  },
+  badgeInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  badgeInlineText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  notesText: {
+    fontSize: 14,
+    lineHeight: 22,
+    paddingHorizontal: 4,
+  },
 
   /* error banner */
   errorBanner: {
