@@ -7,7 +7,9 @@ import {
   StatusBar,
   Vibration,
   Animated,
+  Modal,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -26,6 +28,7 @@ export default function ScanScreen() {
   const [torchOn, setTorchOn] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const [showQrModal, setShowQrModal] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -253,9 +256,16 @@ export default function ScanScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.hint}>
-              Point camera at the fuel receipt QR code
-            </Text>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={() => setShowQrModal(true)}
+              style={styles.dragHandleContainer}
+            >
+              <View style={styles.pullUpPill} />
+              <Text style={styles.hint}>
+                Drag up to show Station QR Code
+              </Text>
+            </TouchableOpacity>
           )}
 
           {scanned && !isProcessing && (
@@ -283,6 +293,48 @@ export default function ScanScreen() {
           )}
         </View>
       </View>
+
+      {/* Sliding UP QR Modal */}
+      <Modal
+        visible={showQrModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowQrModal(false)}
+      >
+        <View style={styles.slideUpOverlay}>
+          <TouchableOpacity style={styles.slideUpDismiss} onPress={() => setShowQrModal(false)} />
+          <View style={[styles.slideUpContent, { backgroundColor: theme.surface }]}>
+            <View style={styles.dragPill} />
+            
+            <Text style={[styles.qrTitle, { color: theme.text }]}>Receive Payment</Text>
+            <Text style={[styles.qrDesc, { color: theme.subText }]}>
+              Customer can scan this QR code using the Fuel Flow app to process payment.
+            </Text>
+
+            {user?.station?.id && (
+              <View style={styles.qrCodeWrapper}>
+                <QRCode
+                  value={`fuelflow://station/${user.station.id}`}
+                  size={240}
+                />
+              </View>
+            )}
+
+            <View style={styles.qrBranding}>
+               <Text style={[styles.brandingText, { color: theme.text }]}>
+                 Fuel Flow <Text style={{ color: theme.primary }}>|</Text> {user?.station?.name || "Station"}
+               </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.closeModalBtn, { backgroundColor: `${theme.primary}15` }]}
+              onPress={() => setShowQrModal(false)}
+            >
+              <Text style={[styles.closeModalText, { color: theme.primary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -474,4 +526,84 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   permBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
+  dragHandleContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
+    width: "100%",
+  },
+  pullUpPill: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    marginBottom: 10,
+  },
+  slideUpOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  slideUpDismiss: {
+    flex: 1,
+  },
+  slideUpContent: {
+    width: "100%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  dragPill: {
+    width: 48,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#CBD5E1",
+    marginBottom: 24,
+  },
+  qrTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  qrDesc: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    marginTop: 8,
+    marginBottom: 28,
+  },
+  qrCodeWrapper: {
+    padding: 24,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  qrBranding: {
+    marginTop: 32,
+    marginBottom: 32,
+  },
+  brandingText: {
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  closeModalBtn: {
+    width: "100%",
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  closeModalText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
