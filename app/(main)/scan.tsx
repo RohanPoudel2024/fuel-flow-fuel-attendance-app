@@ -8,6 +8,7 @@ import {
   Vibration,
   Animated,
   Modal,
+  PanResponder,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,6 +30,30 @@ export default function ScanScreen() {
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const [showQrModal, setShowQrModal] = useState(false);
+
+  const pullUpPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderEnd: (e, gestureState) => {
+        if (gestureState.dy < -20) {
+          setShowQrModal(true);
+        } else if (Math.abs(gestureState.dy) < 5 && Math.abs(gestureState.dx) < 5) {
+          setShowQrModal(true);
+        }
+      },
+    }),
+  ).current;
+
+  const pullDownPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderEnd: (e, gestureState) => {
+        if (gestureState.dy > 50) {
+          setShowQrModal(false);
+        }
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -256,16 +281,15 @@ export default function ScanScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              onPress={() => setShowQrModal(true)}
+            <View 
               style={styles.dragHandleContainer}
+              {...pullUpPanResponder.panHandlers}
             >
               <View style={styles.pullUpPill} />
               <Text style={styles.hint}>
                 Drag up to show Station QR Code
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
 
           {scanned && !isProcessing && (
@@ -303,7 +327,10 @@ export default function ScanScreen() {
       >
         <View style={styles.slideUpOverlay}>
           <TouchableOpacity style={styles.slideUpDismiss} onPress={() => setShowQrModal(false)} />
-          <View style={[styles.slideUpContent, { backgroundColor: theme.surface }]}>
+          <View 
+            style={[styles.slideUpContent, { backgroundColor: theme.surface }]}
+            {...pullDownPanResponder.panHandlers}
+          >
             <View style={styles.dragPill} />
             
             <Text style={[styles.qrTitle, { color: theme.text }]}>Receive Payment</Text>
@@ -316,6 +343,10 @@ export default function ScanScreen() {
                 <QRCode
                   value={`fuelflow://station/${user.station.id}`}
                   size={240}
+                  logo={user.station.profileImageUrl ? { uri: user.station.profileImageUrl } : undefined}
+                  logoSize={55}
+                  logoBackgroundColor="#fff"
+                  logoBorderRadius={12}
                 />
               </View>
             )}

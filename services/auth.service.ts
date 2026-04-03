@@ -53,6 +53,7 @@ export interface StationUser {
     id: string;
     name: string;
     location: string;
+    profileImageUrl?: string;
   } | null;
   staffProfileId: string | null;
 }
