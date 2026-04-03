@@ -38,6 +38,17 @@ export default function TransactionDetailScreen() {
       return {} as FuelTransaction;
     }
   });
+
+  // Sync state when params change
+  useEffect(() => {
+    if (params.transaction) {
+      try {
+        setTransaction(JSON.parse(params.transaction) as FuelTransaction);
+      } catch (err) {
+        console.error("Failed to parse transaction params", err);
+      }
+    }
+  }, [params.transaction]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<"fill" | "verify" | null>(null);

@@ -71,7 +71,6 @@ export default function MainLayout() {
   const { theme } = useTheme();
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <Tabs
         tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
@@ -81,8 +80,10 @@ export default function MainLayout() {
       >
         <Tabs.Screen name="scan" />
         <Tabs.Screen name="history" />
+        <Tabs.Screen name="transaction-detail" options={{ href: null }} />
+        <Tabs.Screen name="history-detail" options={{ href: null }} />
+        <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
-    </View>
   );
 }
 
