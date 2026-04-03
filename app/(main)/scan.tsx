@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { authService, type StationUser } from "../../services/auth.service";
@@ -75,6 +75,15 @@ export default function ScanScreen() {
       if (data?.profileImageUrl) setLiveStationImageUrl(data.profileImageUrl);
     });
   }, [showQrModal, user?.station?.id]);
+
+  // Reset state when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      setScanned(false);
+      setIsProcessing(false);
+      setScanError(null);
+    }, [])
+  );
 
   // Animate the scan line
   useEffect(() => {
