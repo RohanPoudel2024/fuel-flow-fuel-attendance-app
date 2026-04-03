@@ -31,6 +31,7 @@ export default function ScanScreen() {
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const [showQrModal, setShowQrModal] = useState(false);
+  const [liveStationImageUrl, setLiveStationImageUrl] = useState<string | null>(null);
 
   const pullUpPanResponder = useRef(
     PanResponder.create({
@@ -67,6 +68,13 @@ export default function ScanScreen() {
     };
     void loadUser();
   }, [router]);
+
+  useEffect(() => {
+    if (!showQrModal || !user?.station?.id) return;
+    authService.getStation(user.station.id).then((data) => {
+      if (data?.profileImageUrl) setLiveStationImageUrl(data.profileImageUrl);
+    });
+  }, [showQrModal, user?.station?.id]);
 
   // Animate the scan line
   useEffect(() => {
@@ -343,7 +351,7 @@ export default function ScanScreen() {
               <View style={styles.qrCodeWrapper}>
                 <QRCode
                   value={`fuelflow://station/${user.station.id}`}
-                  size={240}
+                  size={190}
                 />
               </View>
             )}
@@ -357,11 +365,11 @@ export default function ScanScreen() {
               <View style={[styles.brandDivider, { backgroundColor: theme.cardBorder }]} />
 
               <View style={styles.brandColumn}>
-                {user?.station?.profileImageUrl ? (
-                  <Image source={{ uri: user.station.profileImageUrl }} style={styles.brandIcon} />
+                {(liveStationImageUrl || user?.station?.profileImageUrl) ? (
+                  <Image source={{ uri: liveStationImageUrl ?? user!.station!.profileImageUrl! }} style={styles.brandIcon} />
                 ) : (
                   <View style={[styles.brandIconPlaceholder, { backgroundColor: `${theme.primary}20` }]}>
-                    <MaterialCommunityIcons name="gas-station" size={24} color={theme.primary} />
+                    <MaterialCommunityIcons name="gas-station" size={20} color={theme.primary} />
                   </View>
                 )}
                 <Text style={[styles.brandText, { color: theme.text }]} numberOfLines={1}>
@@ -595,7 +603,7 @@ const styles = StyleSheet.create({
     width: "100%",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    padding: 24,
+    padding: 18,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
@@ -608,23 +616,23 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
     backgroundColor: "#CBD5E1",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   qrTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "700",
   },
   qrDesc: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: "center",
-    lineHeight: 20,
-    marginTop: 8,
-    marginBottom: 28,
+    lineHeight: 18,
+    marginTop: 4,
+    marginBottom: 18,
   },
   qrCodeWrapper: {
-    padding: 24,
+    padding: 16,
     backgroundColor: "#fff",
-    borderRadius: 24,
+    borderRadius: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -635,26 +643,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 28,
-    marginBottom: 32,
+    marginTop: 20,
+    marginBottom: 20,
     width: "100%",
   },
   brandColumn: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
   },
   brandIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     resizeMode: "cover",
   },
   brandIconPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },

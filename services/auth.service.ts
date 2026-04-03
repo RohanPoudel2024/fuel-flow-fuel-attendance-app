@@ -98,4 +98,13 @@ export const authService = {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     return !!token;
   },
+
+  async getStation(stationId: string): Promise<{ profileImageUrl?: string; name?: string } | null> {
+    try {
+      const response = await api.get<{ profileImageUrl?: string; name?: string }>(`/station/${stationId}`);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
 };
