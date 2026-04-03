@@ -53,6 +53,7 @@ export interface StationUser {
     id: string;
     name: string;
     location: string;
+    profileImageUrl?: string;
   } | null;
   staffProfileId: string | null;
 }
@@ -96,5 +97,14 @@ export const authService = {
   async isLoggedIn(): Promise<boolean> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     return !!token;
+  },
+
+  async getStation(stationId: string): Promise<{ profileImageUrl?: string; name?: string } | null> {
+    try {
+      const response = await api.get<{ profileImageUrl?: string; name?: string }>(`/station/${stationId}`);
+      return response.data;
+    } catch {
+      return null;
+    }
   },
 };

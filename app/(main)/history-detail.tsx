@@ -63,6 +63,9 @@ export default function HistoryDetailScreen() {
   const fuelTypeColor = tx.fuelType === "PETROL" ? theme.success : theme.accent;
   const fuelIcon: IconName = tx.fuelType === "PETROL" ? "leaf" : "fire";
 
+  const calcUnitPrice = tx.pricePerLiter || (tx.totalAmount && tx.quantity ? tx.totalAmount / tx.quantity : 0);
+  const displayUnitPrice = calcUnitPrice > 0 ? calcUnitPrice : 0;
+
   const Row = ({
     icon,
     label,
@@ -111,102 +114,93 @@ export default function HistoryDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Banner */}
-        <View style={[styles.statusCard, { backgroundColor: `${theme.success}10`, borderColor: `${theme.success}30` }]}>
-          <MaterialCommunityIcons
-            name="check-circle"
-            size={34}
-            color={theme.success}
-          />
-          <View>
-            <Text style={[styles.statusLabel, { color: theme.success }]}>Fuel Dispensed</Text>
-            <Text style={[styles.statusTime, { color: theme.text }]}>
-              Filled {formatDate(entry.filledAt ?? entry.timestamp)}
-            </Text>
+        {/* Main Hero: Amount & Fuel Type */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroFuelType}>
+            <MaterialCommunityIcons name={fuelIcon} size={24} color={fuelTypeColor} />
+            <Text style={[styles.heroFuelLabel, { color: fuelTypeColor }]}>{tx.fuelType ?? "—"}</Text>
           </View>
+          <Text style={[styles.heroAmount, { color: theme.text }]}>
+            Rs. {tx.totalAmount?.toFixed(2) ?? "0.00"}
+          </Text>
+          <Text style={[styles.heroQty, { color: theme.subText }]}>
+            {tx.quantity?.toFixed(2) ?? "0.00"} Liters @ Rs. {displayUnitPrice.toFixed(2)}/L
+          </Text>
         </View>
 
-        {/* Fuel Summary */}
-        <View style={[styles.fuelCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <View style={[styles.fuelIconWrap, { backgroundColor: fuelTypeColor + "15" }]}>
-            <MaterialCommunityIcons name={fuelIcon} size={30} color={fuelTypeColor} />
-          </View>
-          <View style={styles.fuelInfo}>
-            <Text style={[styles.fuelType, { color: fuelTypeColor }]}>
-              {tx.fuelType ?? "—"}
-            </Text>
-            <Text style={[styles.fuelQty, { color: theme.subText }]}>
-              {tx.quantity?.toFixed(2) ?? "0.00"} Liters
-            </Text>
-          </View>
-          <View style={styles.fuelAmount}>
-            <Text style={[styles.amountLabel, { color: theme.subText }]}>Total Paid</Text>
-            <Text style={[styles.amountValue, { color: theme.text }]}>
-              Rs. {tx.totalAmount?.toFixed(2) ?? "0.00"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Transaction Info */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: theme.subText }]}>Transaction Info</Text>
+        {/* Seamless Details List */}
+        <View style={styles.detailsList}>
+          <Text style={[styles.listSectionTitle, { color: theme.subText }]}>TRANSACTION DETAILS</Text>
+          
           <Row icon="identifier" label="Transaction No" value={tx.transactionNo ?? "—"} />
-          <Row icon="currency-inr" label="Price / Liter" value={tx.pricePerLiter ? `Rs. ${tx.pricePerLiter.toFixed(2)}` : "—"} />
-          <Row icon="check-decagram-outline" label="Payment Status" value={tx.status ?? "—"} valueColor={tx.status === "COMPLETED" ? theme.success : theme.warning} />
-          <Row icon="gas-station-outline" label="Fill Status" value="FILLED" valueColor={theme.success} />
+          <Row icon="currency-inr" label="Price / Liter" value={`Rs. ${displayUnitPrice.toFixed(2)}`} />
           <Row icon="calendar-outline" label="Transaction Date" value={formatDate(tx.createdAt)} />
+          <Row icon="check-decagram-outline" label="Payment Status" value={tx.status ?? "—"} valueColor={tx.status === "COMPLETED" ? theme.success : theme.warning} />
+          
+          <View style={[styles.statusRow, { borderBottomColor: theme.bg }]}>
+            <View style={styles.rowLeft}>
+              <MaterialCommunityIcons name="gas-station-outline" size={16} color={theme.subText} />
+              <Text style={[styles.rowLabel, { color: theme.subText }]}>Fill Status</Text>
+            </View>
+            <View style={[styles.badgeInline, { backgroundColor: `${theme.success}15`, borderColor: theme.success + "40" }]}>
+              <MaterialCommunityIcons name="check-circle" size={12} color={theme.success} />
+              <Text style={[styles.badgeInlineText, { color: theme.success }]}>FILLED</Text>
+            </View>
+          </View>
           <Row icon="clock-check-outline" label="Filled At" value={formatDate(entry.filledAt ?? entry.timestamp)} />
+
+          {/* Station Info */}
+          {tx.station && (
+            <>
+              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>STATION INFO</Text>
+              <Row icon="gas-station-outline" label="Name" value={tx.station.name ?? "—"} />
+              {tx.station.location ? (
+                <Row icon="map-marker-outline" label="Location" value={tx.station.location} />
+              ) : null}
+            </>
+          )}
+
+          {/* Customer Info */}
+          {tx.customer && (
+            <>
+              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>CUSTOMER INFO</Text>
+              <Row icon="account-outline" label="Name" value={tx.customer.name ?? "—"} />
+              {tx.customer.phone && (
+                <Row icon="phone-outline" label="Phone" value={tx.customer.phone} />
+              )}
+            </>
+          )}
+
+          {/* Payment Receipts */}
+          {tx.paymentReceipts && tx.paymentReceipts.length > 0 && (
+            <>
+              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>PAYMENT RECEIPTS</Text>
+              {tx.paymentReceipts.map((r, i) => (
+                <Row key={i} icon="receipt" label={`Receipt #${i + 1}`} value={r.receiptNo} />
+              ))}
+            </>
+          )}
+
+          {/* Notes */}
+          {tx.notes && (
+            <>
+              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>NOTES</Text>
+              <Text style={[styles.notesText, { color: theme.text }]}>{tx.notes}</Text>
+            </>
+          )}
         </View>
 
-        {/* Customer Info */}
-        {tx.customer && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Customer</Text>
-            <Row icon="account-outline" label="Name" value={tx.customer.name ?? "—"} />
-            {tx.customer.phone && (
-              <Row icon="phone-outline" label="Phone" value={tx.customer.phone} />
-            )}
-          </View>
-        )}
-
-        {/* Station Info */}
-        {tx.station && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Station</Text>
-            <Row icon="gas-station-outline" label="Name" value={tx.station.name ?? "—"} />
-            {tx.station.location ? (
-              <Row icon="map-marker-outline" label="Location" value={tx.station.location} />
-            ) : null}
-          </View>
-        )}
-
-        {/* Payment Receipts */}
-        {tx.paymentReceipts && tx.paymentReceipts.length > 0 && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Payment Receipt</Text>
-            {tx.paymentReceipts.map((r, i) => (
-              <Row key={i} icon="receipt" label={`Receipt #${i + 1}`} value={r.receiptNo} />
-            ))}
-          </View>
-        )}
-
-        {/* Notes */}
-        {tx.notes && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Notes</Text>
-            <Text style={[styles.notesText, { color: theme.subText }]}>{tx.notes}</Text>
-          </View>
-        )}
-
-        {/* Back to History button */}
-        <TouchableOpacity
-          style={[styles.backHistoryBtn, { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}40` }]}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={18} color={theme.primary} />
-          <Text style={[styles.backHistoryText, { color: theme.primary }]}>Back to History</Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.backHistoryBtn, { borderColor: theme.primary }]}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={20} color={theme.primary} />
+            <Text style={[styles.backHistoryText, { color: theme.primary }]}>Back to History</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -242,95 +236,101 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: "700" },
   headerSub: { fontSize: 13, marginTop: 1, fontWeight: "500" },
 
-  /* status banner */
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-  },
-  statusLabel: { fontSize: 18, fontWeight: "700" },
-  statusTime: { fontSize: 13, marginTop: 4, fontWeight: "500" },
-
-  /* fuel */
-  fuelCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  fuelIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 15,
+  /* Main Hero */
+  heroSection: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 28,
+    marginBottom: 8,
   },
-  fuelInfo: { flex: 1 },
-  fuelType: { fontSize: 18, fontWeight: "700" },
-  fuelQty: { fontSize: 13, marginTop: 2, fontWeight: "500" },
-  fuelAmount: { alignItems: "flex-end" },
-  amountLabel: { fontSize: 12, fontWeight: "500" },
-  amountValue: { fontSize: 20, fontWeight: "800" },
-
-  /* card */
-  card: {
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+  heroFuelType: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginBottom: 12,
   },
+  heroFuelLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  heroAmount: {
+    fontSize: 42,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  heroQty: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
 
-  /* row */
+  /* Details List */
+  detailsList: {
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  listSectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 16,
+    marginLeft: 4,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 9,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
   },
-  rowLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rowLabel: { fontSize: 13, fontWeight: "500" },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rowLabel: { fontSize: 14, fontWeight: "500" },
   rowValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
-    maxWidth: "55%",
+    maxWidth: "50%",
     textAlign: "right",
   },
+  badgeInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  badgeInlineText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  notesText: {
+    fontSize: 14,
+    lineHeight: 22,
+    paddingHorizontal: 4,
+    fontWeight: "500",
+  },
 
-  /* notes */
-  notesText: { fontSize: 14, lineHeight: 22, fontWeight: "500" },
-
-  /* back button */
+  /* actions */
+  actions: { gap: 10, marginTop: 4 },
   backHistoryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
     height: 54,
     borderRadius: 14,
     borderWidth: 1.5,
-    marginTop: 8,
   },
   backHistoryText: { fontSize: 16, fontWeight: "700" },
 });

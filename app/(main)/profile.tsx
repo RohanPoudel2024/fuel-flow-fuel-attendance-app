@@ -6,20 +6,40 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
+  ActivityIndicator,
+  Modal,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { authService, type StationUser } from "../../services/auth.service";
+import { API_URL } from "../../config/api.config";
 import { useTheme } from "../../context/theme-context";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
+
+interface RatingItem {
+  rating: number;
+  comment?: string;
+  createdAt: string;
+  customer: { name: string };
+}
+
+interface StationRatingProfile {
+  avgRating: number;
+  totalRatings: number;
+  recentRatings: RatingItem[];
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { theme, isDark, toggleTheme } = useTheme();
   const [user, setUser] = useState<StationUser | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [ratingProfile, setRatingProfile] = useState<StationRatingProfile | null>(null);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +53,27 @@ export default function ProfileScreen() {
     await authService.logout();
     router.replace("/(auth)/login");
   };
+
+  useEffect(() => {
+    if (!user?.station?.id) return;
+    const fetchRatings = async () => {
+      setRatingsLoading(true);
+      try {
+        const token = await authService.getToken();
+        const res = await fetch(`${API_URL}/station/${user.station!.id}/profile`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRatingProfile(data);
+        }
+      } catch {
+      } finally {
+        setRatingsLoading(false);
+      }
+    };
+    void fetchRatings();
+  }, [user?.station?.id]);
 
   const InfoRow = ({
     icon,
@@ -135,6 +176,59 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* Station Ratings */}
+        {user?.station && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.cardTitle, { color: theme.subText }]}>Station Ratings</Text>
+            {ratingsLoading ? (
+              <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
+            ) : ratingProfile ? (
+              <>
+                <View style={styles.ratingOverview}>
+                  <Text style={[styles.ratingBig, { color: theme.primary }]}>
+                    {ratingProfile.totalRatings > 0 ? ratingProfile.avgRating.toFixed(1) : "—"}
+                  </Text>
+                  <View>
+                    <View style={{ flexDirection: "row", gap: 2 }}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <MaterialCommunityIcons
+                          key={s}
+                          name={s <= Math.round(ratingProfile.avgRating) ? "star" : "star-outline"}
+                          size={14}
+                          color={theme.primary}
+                        />
+                      ))}
+                    </View>
+                    <Text style={[styles.ratingCount, { color: theme.subText }]}>
+                      {ratingProfile.totalRatings} {ratingProfile.totalRatings === 1 ? "review" : "reviews"}
+                    </Text>
+                  </View>
+                </View>
+                {ratingProfile.recentRatings.slice(0, 3).map((r, idx) => (
+                  <View key={idx} style={[styles.reviewRow, { borderTopColor: theme.bg }]}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={[styles.reviewName, { color: theme.text }]}>{r.customer.name}</Text>
+                      <View style={{ flexDirection: "row", gap: 1 }}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <MaterialCommunityIcons
+                            key={s}
+                            name={s <= r.rating ? "star" : "star-outline"}
+                            size={11}
+                            color={theme.primary}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                    {r.comment ? <Text style={[styles.reviewComment, { color: theme.subText }]}>{r.comment}</Text> : null}
+                  </View>
+                ))}
+              </>
+            ) : (
+              <Text style={[styles.infoValue, { color: theme.subText }]}>No ratings yet</Text>
+            )}
+          </View>
+        )}
+
         {/* Appearance Settings */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
           <Text style={[styles.cardTitle, { color: theme.subText }]}>Appearance</Text>
@@ -159,6 +253,18 @@ export default function ProfileScreen() {
         {/* Quick Actions */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
           <Text style={[styles.cardTitle, { color: theme.subText }]}>Quick Actions</Text>
+          {user?.station && (
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => setShowQrModal(true)}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: `${theme.primary}15` }]}>
+                <MaterialCommunityIcons name="qrcode" size={20} color={theme.primary} />
+              </View>
+              <Text style={[styles.actionText, { color: theme.text }]}>Show Receiving QR</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.actionRow}
             onPress={() => router.replace("/(main)/scan")}
@@ -212,6 +318,31 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* QR Modal */}
+      <Modal visible={showQrModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.qrModalContent, { backgroundColor: theme.surface }]}>
+            <View style={styles.qrHeader}>
+              <Text style={[styles.qrTitle, { color: theme.text }]}>Station QR Code</Text>
+              <TouchableOpacity onPress={() => setShowQrModal(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={theme.subText} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.qrDesc, { color: theme.subText }]}>
+              Show this QR code to customers so they can scan and pay for their fuel.
+            </Text>
+            {user?.station?.id ? (
+              <View style={styles.qrCodeWrapper}>
+                <QRCode
+                  value={`fuelflow://station/${user.station.id}`}
+                  size={220}
+                />
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -384,4 +515,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   logoutOkText: { fontSize: 14, fontWeight: "700" },
+  ratingOverview: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
+  ratingBig: { fontSize: 28, fontWeight: "800" },
+  ratingCount: { fontSize: 11, marginTop: 2 },
+  reviewRow: { borderTopWidth: 1, paddingTop: 8, marginTop: 6 },
+  reviewName: { fontSize: 12, fontWeight: "600" },
+  reviewComment: { fontSize: 12, marginTop: 2 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  qrModalContent: {
+    width: "100%",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+  },
+  qrHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 12,
+  },
+  qrTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  qrDesc: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 32,
+  },
+  qrCodeWrapper: {
+    padding: 20,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
 });

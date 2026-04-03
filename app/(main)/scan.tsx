@@ -7,7 +7,11 @@ import {
   StatusBar,
   Vibration,
   Animated,
+  Modal,
+  PanResponder,
+  Image,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -26,6 +30,32 @@ export default function ScanScreen() {
   const [torchOn, setTorchOn] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [liveStationImageUrl, setLiveStationImageUrl] = useState<string | null>(null);
+
+  const pullUpPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderEnd: (e, gestureState) => {
+        if (gestureState.dy < -20) {
+          setShowQrModal(true);
+        } else if (Math.abs(gestureState.dy) < 5 && Math.abs(gestureState.dx) < 5) {
+          setShowQrModal(true);
+        }
+      },
+    }),
+  ).current;
+
+  const pullDownPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderEnd: (e, gestureState) => {
+        if (gestureState.dy > 50) {
+          setShowQrModal(false);
+        }
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -38,6 +68,13 @@ export default function ScanScreen() {
     };
     void loadUser();
   }, [router]);
+
+  useEffect(() => {
+    if (!showQrModal || !user?.station?.id) return;
+    authService.getStation(user.station.id).then((data) => {
+      if (data?.profileImageUrl) setLiveStationImageUrl(data.profileImageUrl);
+    });
+  }, [showQrModal, user?.station?.id]);
 
   // Animate the scan line
   useEffect(() => {
@@ -253,9 +290,17 @@ export default function ScanScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.hint}>
-              Point camera at the fuel receipt QR code
+          <TouchableOpacity
+            style={[styles.dragHandleContainer, { backgroundColor: `${theme.primary}15`, borderWidth: 1, borderColor: `${theme.primary}30` }]}
+            {...pullUpPanResponder.panHandlers}
+            onPress={() => setShowQrModal(true)}
+          >
+            <MaterialCommunityIcons name="qrcode" size={18} color={theme.primary} />
+            <Text style={[styles.hint, { color: theme.primary, fontWeight: "700" }]}>
+              Tap to show Station QR Code
             </Text>
+            <MaterialCommunityIcons name="chevron-up" size={16} color={theme.primary} />
+          </TouchableOpacity>
           )}
 
           {scanned && !isProcessing && (
@@ -283,6 +328,74 @@ export default function ScanScreen() {
           )}
         </View>
       </View>
+
+      {/* Sliding UP QR Modal */}
+      <Modal
+        visible={showQrModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowQrModal(false)}
+      >
+        <View style={styles.slideUpOverlay}>
+          <TouchableOpacity style={styles.slideUpDismiss} onPress={() => setShowQrModal(false)} />
+          <View
+            style={[styles.slideUpContent, { backgroundColor: theme.bg }]}
+            {...pullDownPanResponder.panHandlers}
+          >
+            {/* Drag handle */}
+            <View style={styles.dragPill} />
+
+            {/* Orange header */}
+            <View style={[styles.qrHeader, { backgroundColor: theme.primary }]}>
+              <MaterialCommunityIcons name="qrcode-scan" size={20} color="#fff" />
+              <Text style={styles.qrHeaderTitle}>Receive Payment</Text>
+            </View>
+
+            <Text style={[styles.qrDesc, { color: theme.subText }]}>
+              Ask the customer to open Fuel Flow app and scan this QR code
+            </Text>
+
+            {user?.station?.id && (
+              <View style={styles.qrCodeWrapper}>
+                <QRCode
+                  value={`fuelflow://station/${user.station.id}`}
+                  size={190}
+                />
+              </View>
+            )}
+
+            <View style={[styles.qrBranding, { borderTopColor: theme.divider }]}>
+              <View style={styles.brandColumn}>
+                <Image source={require("../../assets/images/icon.png")} style={styles.brandIcon} />
+                <Text style={[styles.brandText, { color: theme.subText }]}>Fuel Flow</Text>
+              </View>
+
+              <View style={[styles.brandDivider, { backgroundColor: theme.divider }]} />
+
+              <View style={styles.brandColumn}>
+                {(liveStationImageUrl || user?.station?.profileImageUrl) ? (
+                  <Image source={{ uri: liveStationImageUrl ?? user!.station!.profileImageUrl! }} style={styles.brandIcon} />
+                ) : (
+                  <View style={[styles.brandIconPlaceholder, { backgroundColor: theme.primaryLight }]}>
+                    <MaterialCommunityIcons name="gas-station" size={20} color={theme.primary} />
+                  </View>
+                )}
+                <Text style={[styles.brandText, { color: theme.subText }]} numberOfLines={1}>
+                  {user?.station?.name || "Station"}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.closeModalBtn, { backgroundColor: theme.primary }]}
+              onPress={() => setShowQrModal(false)}
+            >
+              <MaterialCommunityIcons name="close" size={18} color="#fff" />
+              <Text style={styles.closeModalText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -474,4 +587,129 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   permBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
+  dragHandleContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
+    width: "100%",
+  },
+  pullUpPill: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.4)",
+    marginBottom: 10,
+  },
+  slideUpOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  slideUpDismiss: {
+    flex: 1,
+  },
+  slideUpContent: {
+    width: "100%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 18,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  dragPill: {
+    width: 48,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#CBD5E1",
+    marginBottom: 20,
+    alignSelf: "center",
+  },
+  qrHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    alignSelf: "stretch",
+    justifyContent: "center",
+  },
+  qrHeaderTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  qrDesc: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  qrCodeWrapper: {
+    padding: 16,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  qrBranding: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 18,
+    marginBottom: 16,
+    paddingTop: 16,
+    width: "100%",
+  },
+  brandColumn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  brandIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    resizeMode: "cover",
+  },
+  brandIconPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandDivider: {
+    height: 40,
+    width: 1.5,
+    marginHorizontal: 16,
+  },
+  brandText: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  closeModalBtn: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  closeModalText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
+  },
 });
