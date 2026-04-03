@@ -32,6 +32,9 @@ interface StationRatingProfile {
   recentRatings: RatingItem[];
 }
 
+const TABS = ["Account", "Station", "Settings"];
+type TabType = "Account" | "Station" | "Settings";
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { theme, isDark, toggleTheme } = useTheme();
@@ -40,6 +43,7 @@ export default function ProfileScreen() {
   const [ratingProfile, setRatingProfile] = useState<StationRatingProfile | null>(null);
   const [ratingsLoading, setRatingsLoading] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("Account");
 
   useEffect(() => {
     const load = async () => {
@@ -99,6 +103,224 @@ export default function ProfileScreen() {
     user?.userType === "STATION_ADMIN" ? "Station Admin" : "Station Staff";
   const roleColor = user?.userType === "STATION_ADMIN" ? theme.info : theme.primary;
 
+  const renderTabs = () => (
+    <View style={[styles.tabContainer, { borderBottomColor: theme.cardBorder }]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabScroll}
+      >
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[
+                styles.tabBtn,
+                isActive && { backgroundColor: theme.primary },
+              ]}
+              onPress={() => setActiveTab(tab as TabType)}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  isActive ? { color: "#fff", fontWeight: "700" } : { color: theme.subText },
+                ]}
+              >
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const renderAccountTab = () => (
+    <View style={styles.tabContent}>
+      {/* Avatar Section goes into Account to keep things neat */}
+      <View style={styles.avatarSection}>
+        <View style={[styles.avatar, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+          <MaterialCommunityIcons name="account" size={48} color={theme.primary} />
+        </View>
+        <Text style={[styles.name, { color: theme.text }]}>{user?.name ?? "—"}</Text>
+        <View style={[styles.roleBadge, { backgroundColor: `${roleColor}10`, borderColor: `${roleColor}40` }]}>
+          <MaterialCommunityIcons
+            name={
+              user?.userType === "STATION_ADMIN"
+                ? "shield-crown-outline"
+                : "account-hard-hat-outline"
+            }
+            size={13}
+            color={roleColor}
+          />
+          <Text style={[styles.roleText, { color: roleColor }]}>
+            {roleLabel}
+          </Text>
+        </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+        <Text style={[styles.cardTitle, { color: theme.subText }]}>Account Details</Text>
+        <InfoRow icon="email-outline" label="Email" value={user?.email ?? "—"} />
+        {user?.phone && <InfoRow icon="phone-outline" label="Phone" value={user.phone} />}
+        <InfoRow icon="badge-account-outline" label="Role" value={roleLabel} />
+      </View>
+    </View>
+  );
+
+  const renderStationTab = () => (
+    <View style={styles.tabContent}>
+      {user?.station && (
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+          <Text style={[styles.cardTitle, { color: theme.subText }]}>Station Details</Text>
+          <InfoRow
+            icon="gas-station-outline"
+            label="Station Name"
+            value={user.station.name}
+          />
+          <InfoRow
+            icon="map-marker-outline"
+            label="Location"
+            value={user.station.location}
+          />
+        </View>
+      )}
+
+      {user?.station && (
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+          <Text style={[styles.cardTitle, { color: theme.subText }]}>Customer Feedback</Text>
+          {ratingsLoading ? (
+            <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
+          ) : ratingProfile ? (
+            <>
+              <View style={styles.ratingOverview}>
+                <Text style={[styles.ratingBig, { color: theme.primary }]}>
+                  {ratingProfile.totalRatings > 0 ? ratingProfile.avgRating.toFixed(1) : "—"}
+                </Text>
+                <View>
+                  <View style={{ flexDirection: "row", gap: 2 }}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <MaterialCommunityIcons
+                        key={s}
+                        name={s <= Math.round(ratingProfile.avgRating) ? "star" : "star-outline"}
+                        size={14}
+                        color={theme.primary}
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.ratingCount, { color: theme.subText }]}>
+                    {ratingProfile.totalRatings} {ratingProfile.totalRatings === 1 ? "review" : "reviews"}
+                  </Text>
+                </View>
+              </View>
+              {ratingProfile.recentRatings.slice(0, 3).map((r, idx) => (
+                <View key={idx} style={[styles.reviewRow, { borderTopColor: theme.bg }]}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={[styles.reviewName, { color: theme.text }]}>{r.customer.name}</Text>
+                    <View style={{ flexDirection: "row", gap: 1 }}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <MaterialCommunityIcons
+                          key={s}
+                          name={s <= r.rating ? "star" : "star-outline"}
+                          size={11}
+                          color={theme.primary}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                  {r.comment ? <Text style={[styles.reviewComment, { color: theme.subText }]}>{r.comment}</Text> : null}
+                </View>
+              ))}
+            </>
+          ) : (
+            <Text style={[styles.infoValue, { color: theme.subText }]}>No ratings yet</Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  const renderSettingsTab = () => (
+    <View style={styles.tabContent}>
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+        <Text style={[styles.cardTitle, { color: theme.subText }]}>Appearance</Text>
+        <TouchableOpacity style={styles.actionRow} onPress={toggleTheme}>
+          <View style={[styles.actionIcon, { backgroundColor: isDark ? `${theme.warning}15` : `${theme.secondary}15` }]}>
+            <MaterialCommunityIcons
+              name={isDark ? "white-balance-sunny" : "moon-waning-crescent"}
+              size={20}
+              color={isDark ? theme.warning : theme.secondary}
+            />
+          </View>
+          <Text style={[styles.actionText, { color: theme.text }]}>
+            {isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          </Text>
+          <MaterialCommunityIcons name="theme-light-dark" size={20} color={theme.subText} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+        <Text style={[styles.cardTitle, { color: theme.subText }]}>Quick Actions</Text>
+        {user?.station && (
+          <TouchableOpacity style={styles.actionRow} onPress={() => setShowQrModal(true)}>
+            <View style={[styles.actionIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <MaterialCommunityIcons name="qrcode" size={20} color={theme.primary} />
+            </View>
+            <Text style={[styles.actionText, { color: theme.text }]}>Show Receiving QR</Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.actionRow} onPress={() => router.replace("/(main)/scan")}>
+          <View style={[styles.actionIcon, { backgroundColor: `${theme.info}15` }]}>
+            <MaterialCommunityIcons name="qrcode-scan" size={20} color={theme.info} />
+          </View>
+          <Text style={[styles.actionText, { color: theme.text }]}>Scan QR Code</Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionRow} onPress={() => router.replace("/(main)/history")}>
+          <View style={[styles.actionIcon, { backgroundColor: `${theme.accent}15` }]}>
+            <MaterialCommunityIcons name="history" size={20} color={theme.accent} />
+          </View>
+          <Text style={[styles.actionText, { color: theme.text }]}>View Fill History</Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Logout confirm or button */}
+      {showLogoutConfirm ? (
+        <View style={[styles.logoutConfirmCard, { backgroundColor: theme.surface, borderColor: `${theme.danger}40` }]}>
+          <MaterialCommunityIcons name="logout" size={22} color={theme.danger} />
+          <Text style={[styles.logoutConfirmTitle, { color: theme.text }]}>Sign out?</Text>
+          <Text style={[styles.logoutConfirmDesc, { color: theme.subText }]}>
+            You will need to log in again to access the app.
+          </Text>
+          <View style={styles.logoutConfirmBtns}>
+            <TouchableOpacity
+              style={[styles.logoutCancelBtn, { backgroundColor: theme.bg, borderColor: theme.border }]}
+              onPress={() => setShowLogoutConfirm(false)}
+            >
+              <Text style={[styles.logoutCancelText, { color: theme.subText }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.logoutOkBtn, { backgroundColor: `${theme.danger}15`, borderColor: `${theme.danger}50` }]} onPress={() => void doLogout()}>
+              <Text style={[styles.logoutOkText, { color: theme.danger }]}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.logoutBtn, { backgroundColor: `${theme.danger}10`, borderColor: `${theme.danger}30` }]}
+          onPress={() => setShowLogoutConfirm(true)}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="logout" size={18} color={theme.danger} />
+          <Text style={[styles.logoutText, { color: theme.danger }]}>Sign Out</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.bg} />
@@ -115,208 +337,15 @@ export default function ProfileScreen() {
         <View style={{ width: 40 }} />
       </View>
 
+      {renderTabs()}
+
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.mainScrollContainer}
       >
-        {/* Avatar */}
-        <View style={styles.avatarSection}>
-          <View style={[styles.avatar, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <MaterialCommunityIcons name="account" size={48} color={theme.primary} />
-          </View>
-          <Text style={[styles.name, { color: theme.text }]}>{user?.name ?? "—"}</Text>
-          <View style={[styles.roleBadge, { backgroundColor: `${roleColor}10`, borderColor: `${roleColor}40` }]}>
-            <MaterialCommunityIcons
-              name={
-                user?.userType === "STATION_ADMIN"
-                  ? "shield-crown-outline"
-                  : "account-hard-hat-outline"
-              }
-              size={13}
-              color={roleColor}
-            />
-            <Text style={[styles.roleText, { color: roleColor }]}>
-              {roleLabel}
-            </Text>
-          </View>
-        </View>
-
-        {/* Account Info */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: theme.subText }]}>Account Info</Text>
-          <InfoRow
-            icon="email-outline"
-            label="Email"
-            value={user?.email ?? "—"}
-          />
-          {user?.phone && (
-            <InfoRow icon="phone-outline" label="Phone" value={user.phone} />
-          )}
-          <InfoRow
-            icon="badge-account-outline"
-            label="Role"
-            value={roleLabel}
-          />
-        </View>
-
-        {/* Station Info */}
-        {user?.station && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Station</Text>
-            <InfoRow
-              icon="gas-station-outline"
-              label="Station Name"
-              value={user.station.name}
-            />
-            <InfoRow
-              icon="map-marker-outline"
-              label="Location"
-              value={user.station.location}
-            />
-          </View>
-        )}
-
-        {/* Station Ratings */}
-        {user?.station && (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.cardTitle, { color: theme.subText }]}>Station Ratings</Text>
-            {ratingsLoading ? (
-              <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
-            ) : ratingProfile ? (
-              <>
-                <View style={styles.ratingOverview}>
-                  <Text style={[styles.ratingBig, { color: theme.primary }]}>
-                    {ratingProfile.totalRatings > 0 ? ratingProfile.avgRating.toFixed(1) : "—"}
-                  </Text>
-                  <View>
-                    <View style={{ flexDirection: "row", gap: 2 }}>
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <MaterialCommunityIcons
-                          key={s}
-                          name={s <= Math.round(ratingProfile.avgRating) ? "star" : "star-outline"}
-                          size={14}
-                          color={theme.primary}
-                        />
-                      ))}
-                    </View>
-                    <Text style={[styles.ratingCount, { color: theme.subText }]}>
-                      {ratingProfile.totalRatings} {ratingProfile.totalRatings === 1 ? "review" : "reviews"}
-                    </Text>
-                  </View>
-                </View>
-                {ratingProfile.recentRatings.slice(0, 3).map((r, idx) => (
-                  <View key={idx} style={[styles.reviewRow, { borderTopColor: theme.bg }]}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={[styles.reviewName, { color: theme.text }]}>{r.customer.name}</Text>
-                      <View style={{ flexDirection: "row", gap: 1 }}>
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <MaterialCommunityIcons
-                            key={s}
-                            name={s <= r.rating ? "star" : "star-outline"}
-                            size={11}
-                            color={theme.primary}
-                          />
-                        ))}
-                      </View>
-                    </View>
-                    {r.comment ? <Text style={[styles.reviewComment, { color: theme.subText }]}>{r.comment}</Text> : null}
-                  </View>
-                ))}
-              </>
-            ) : (
-              <Text style={[styles.infoValue, { color: theme.subText }]}>No ratings yet</Text>
-            )}
-          </View>
-        )}
-
-        {/* Appearance Settings */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: theme.subText }]}>Appearance</Text>
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={toggleTheme}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: isDark ? `${theme.warning}15` : `${theme.secondary}15` }]}>
-              <MaterialCommunityIcons 
-                name={isDark ? "white-balance-sunny" : "moon-waning-crescent"} 
-                size={20} 
-                color={isDark ? theme.warning : theme.secondary} 
-              />
-            </View>
-            <Text style={[styles.actionText, { color: theme.text }]}>
-              {isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            </Text>
-            <MaterialCommunityIcons name="theme-light-dark" size={20} color={theme.subText} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.cardTitle, { color: theme.subText }]}>Quick Actions</Text>
-          {user?.station && (
-            <TouchableOpacity
-              style={styles.actionRow}
-              onPress={() => setShowQrModal(true)}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: `${theme.primary}15` }]}>
-                <MaterialCommunityIcons name="qrcode" size={20} color={theme.primary} />
-              </View>
-              <Text style={[styles.actionText, { color: theme.text }]}>Show Receiving QR</Text>
-              <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => router.replace("/(main)/scan")}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: `${theme.info}15` }]}>
-              <MaterialCommunityIcons name="qrcode-scan" size={20} color={theme.info} />
-            </View>
-            <Text style={[styles.actionText, { color: theme.text }]}>Scan QR Code</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => router.replace("/(main)/history")}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: `${theme.accent}15` }]}>
-              <MaterialCommunityIcons name="history" size={20} color={theme.accent} />
-            </View>
-            <Text style={[styles.actionText, { color: theme.text }]}>View Fill History</Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Logout confirm or button */}
-        {showLogoutConfirm ? (
-          <View style={[styles.logoutConfirmCard, { backgroundColor: theme.surface, borderColor: `${theme.danger}40` }]}>
-            <MaterialCommunityIcons name="logout" size={22} color={theme.danger} />
-            <Text style={[styles.logoutConfirmTitle, { color: theme.text }]}>Sign out?</Text>
-            <Text style={[styles.logoutConfirmDesc, { color: theme.subText }]}>
-              You will need to log in again to access the app.
-            </Text>
-            <View style={styles.logoutConfirmBtns}>
-              <TouchableOpacity
-                style={[styles.logoutCancelBtn, { backgroundColor: theme.bg, borderColor: theme.border }]}
-                onPress={() => setShowLogoutConfirm(false)}
-              >
-                <Text style={[styles.logoutCancelText, { color: theme.subText }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.logoutOkBtn, { backgroundColor: `${theme.danger}15`, borderColor: `${theme.danger}50` }]} onPress={() => void doLogout()}>
-                <Text style={[styles.logoutOkText, { color: theme.danger }]}>Sign Out</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.logoutBtn, { backgroundColor: `${theme.danger}10`, borderColor: `${theme.danger}30` }]}
-            onPress={() => setShowLogoutConfirm(true)}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="logout" size={18} color={theme.danger} />
-            <Text style={[styles.logoutText, { color: theme.danger }]}>Sign Out</Text>
-          </TouchableOpacity>
-        )}
+        {activeTab === "Account" && renderAccountTab()}
+        {activeTab === "Station" && renderStationTab()}
+        {activeTab === "Settings" && renderSettingsTab()}
       </ScrollView>
 
       {/* QR Modal */}
@@ -349,7 +378,8 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40, gap: 12 },
+  mainScrollContainer: { paddingBottom: 40 },
+  tabContent: { padding: 16, gap: 12 },
 
   /* header */
   header: {
@@ -374,8 +404,28 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 17, fontWeight: "700" },
 
+  /* tabs */
+  tabContainer: {
+    borderBottomWidth: 1,
+  },
+  tabScroll: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  tabBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "transparent",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
   /* avatar */
-  avatarSection: { alignItems: "center", paddingVertical: 24, gap: 10 },
+  avatarSection: { alignItems: "center", paddingVertical: 16, gap: 10 },
   avatar: {
     width: 90,
     height: 90,
@@ -383,11 +433,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   name: { fontSize: 22, fontWeight: "700" },
   roleBadge: {
@@ -407,11 +452,6 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     gap: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   cardTitle: {
     fontSize: 12,
