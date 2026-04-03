@@ -9,6 +9,7 @@ import {
   Animated,
   Modal,
   PanResponder,
+  Image,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -343,18 +344,30 @@ export default function ScanScreen() {
                 <QRCode
                   value={`fuelflow://station/${user.station.id}`}
                   size={240}
-                  logo={user.station.profileImageUrl ? { uri: user.station.profileImageUrl } : undefined}
-                  logoSize={55}
-                  logoBackgroundColor="#fff"
-                  logoBorderRadius={12}
                 />
               </View>
             )}
 
             <View style={styles.qrBranding}>
-               <Text style={[styles.brandingText, { color: theme.text }]}>
-                 Fuel Flow <Text style={{ color: theme.primary }}>|</Text> {user?.station?.name || "Station"}
-               </Text>
+              <View style={styles.brandColumn}>
+                <Image source={require("../../assets/images/icon.png")} style={styles.brandIcon} />
+                <Text style={[styles.brandText, { color: theme.text }]}>Fuel Flow</Text>
+              </View>
+
+              <View style={[styles.brandDivider, { backgroundColor: theme.cardBorder }]} />
+
+              <View style={styles.brandColumn}>
+                {user?.station?.profileImageUrl ? (
+                  <Image source={{ uri: user.station.profileImageUrl }} style={styles.brandIcon} />
+                ) : (
+                  <View style={[styles.brandIconPlaceholder, { backgroundColor: `${theme.primary}20` }]}>
+                    <MaterialCommunityIcons name="gas-station" size={24} color={theme.primary} />
+                  </View>
+                )}
+                <Text style={[styles.brandText, { color: theme.text }]} numberOfLines={1}>
+                  {user?.station?.name || "Station"}
+                </Text>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -619,13 +632,41 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   qrBranding: {
-    marginTop: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 28,
     marginBottom: 32,
+    width: "100%",
   },
-  brandingText: {
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: 0.2,
+  brandColumn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  brandIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    resizeMode: "cover",
+  },
+  brandIconPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandDivider: {
+    height: 40,
+    width: 1.5,
+    marginHorizontal: 16,
+  },
+  brandText: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
   closeModalBtn: {
     width: "100%",
