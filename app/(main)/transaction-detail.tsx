@@ -51,7 +51,9 @@ export default function TransactionDetailScreen() {
   }, [params.transaction]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<"fill" | "verify" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"fill" | "verify" | null>(
+    null,
+  );
   const staffId = params.staffId ?? "";
   const [activePrice, setActivePrice] = useState<number>(0);
 
@@ -62,12 +64,17 @@ export default function TransactionDetailScreen() {
         const u = await authService.getUser();
         if (!u?.station?.id) return;
         const token = await authService.getToken();
-        const res = await fetch(`${API_URL}/station/${u.station.id}/fuel-prices`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await fetch(
+          `${API_URL}/station/${u.station.id}/fuel-prices`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          },
+        );
         if (res.ok) {
           const prices = await res.json();
-          const p = prices.find((item: any) => item.fuelType === transaction.fuelType);
+          const p = prices.find(
+            (item: any) => item.fuelType === transaction.fuelType,
+          );
           if (p && p.pricePerUnit && isMounted) {
             setActivePrice(Number(p.pricePerUnit));
           }
@@ -80,7 +87,9 @@ export default function TransactionDetailScreen() {
     if (getUnitPrice(transaction) === 0) {
       void fetchStationPrices();
     }
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [transaction.fuelType]);
 
   const doMarkFilled = async () => {
@@ -88,7 +97,10 @@ export default function TransactionDetailScreen() {
       setIsLoading(true);
       setErrorMsg(null);
       setConfirmAction(null);
-      const updated = await transactionService.markFilled(transaction.id, staffId);
+      const updated = await transactionService.markFilled(
+        transaction.id,
+        staffId,
+      );
       setTransaction(updated);
       const filledAt = new Date().toISOString();
       await historyService.addEntry({
@@ -114,7 +126,7 @@ export default function TransactionDetailScreen() {
         response?: { data?: { message?: string } };
       };
       setErrorMsg(
-        axiosError.response?.data?.message ?? "Failed to update status."
+        axiosError.response?.data?.message ?? "Failed to update status.",
       );
     } finally {
       setIsLoading(false);
@@ -152,9 +164,10 @@ export default function TransactionDetailScreen() {
   const finalUnitPrice = baseUnitPrice > 0 ? baseUnitPrice : activePrice;
 
   // Real-time calculation if not fully synced
-  const calcTotalAmount = transaction.totalAmount && transaction.totalAmount > 0 
-    ? transaction.totalAmount 
-    : (transaction.quantity ?? 0) * finalUnitPrice;
+  const calcTotalAmount =
+    transaction.totalAmount && transaction.totalAmount > 0
+      ? transaction.totalAmount
+      : (transaction.quantity ?? 0) * finalUnitPrice;
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "—";
@@ -179,12 +192,15 @@ export default function TransactionDetailScreen() {
     value: string;
     valueColor?: string;
   }) => (
-    <View style={[styles.row, { borderBottomColor: theme.bg }]}>
+    <View style={styles.row}>
       <View style={styles.rowLeft}>
-        <MaterialCommunityIcons name={icon} size={16} color={theme.subText} />
+        <MaterialCommunityIcons name={icon} size={18} color={theme.subText} />
         <Text style={[styles.rowLabel, { color: theme.subText }]}>{label}</Text>
       </View>
-      <Text style={[styles.rowValue, { color: valueColor || theme.text }]}>
+      <Text
+        style={[styles.rowValue, { color: valueColor || theme.text }]}
+        numberOfLines={1}
+      >
         {value}
       </Text>
     </View>
@@ -192,20 +208,30 @@ export default function TransactionDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.bg} />
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={theme.bg}
+      />
 
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.cardBorder }]}>
-        <TouchableOpacity style={[styles.backBtn, { backgroundColor: theme.surface }]} onPress={() => router.back()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.text} />
+      <View style={[styles.header]}>
+        <TouchableOpacity
+          style={[
+            styles.backBtn,
+            { backgroundColor: theme.surface, borderColor: theme.cardBorder },
+          ]}
+          onPress={() => router.back()}
+        >
+          <MaterialCommunityIcons
+            name="arrow-left"
+            size={22}
+            color={theme.text}
+          />
         </TouchableOpacity>
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Transaction Details</Text>
-          <Text style={[styles.headerSub, { color: theme.subText }]}>
-            {transaction.transactionNo ?? "—"}
-          </Text>
-        </View>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Transaction
+        </Text>
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView
@@ -213,135 +239,316 @@ export default function TransactionDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Main Hero: Amount & Fuel Type */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroFuelType}>
-            <MaterialCommunityIcons name={transaction.fuelType === "PETROL" ? "leaf" : "fire"} size={24} color={fuelTypeColor} />
-            <Text style={[styles.heroFuelLabel, { color: fuelTypeColor }]}>{transaction.fuelType ?? "—"}</Text>
-          </View>
-          <Text style={[styles.heroAmount, { color: theme.text }]}>
-            Rs. {calcTotalAmount?.toFixed(2) ?? "0.00"}
-          </Text>
-          <Text style={[styles.heroQty, { color: theme.subText }]}>
-            {transaction.quantity?.toFixed(2) ?? "0.00"} Liters @ Rs. {Number(finalUnitPrice).toFixed(2)}/L
-          </Text>
-        </View>
-
-        {/* Seamless Details List */}
-        <View style={styles.detailsList}>
-          <Text style={[styles.listSectionTitle, { color: theme.subText }]}>TRANSACTION DETAILS</Text>
-          
-          <Row icon="identifier" label="Transaction No" value={transaction.transactionNo ?? "—"} />
-          <Row icon="currency-inr" label="Price/Liter" value={`Rs. ${Number(finalUnitPrice).toFixed(2) ?? "0.00"}`} />
-          <Row icon="calendar-outline" label="Date & Time" value={formatDate(transaction.createdAt)} />
-          <Row icon="check-circle-outline" label="Payment Status" value={transaction.status ?? "—"} valueColor={theme.success} />
-          
-          <View style={[styles.statusRow, { borderBottomColor: theme.bg }]}>
-            <View style={styles.rowLeft}>
-              <MaterialCommunityIcons name="gas-station-outline" size={16} color={theme.subText} />
-              <Text style={[styles.rowLabel, { color: theme.subText }]}>Fill Status</Text>
+        {/* Receipt Card */}
+        <View
+          style={[
+            styles.receiptCard,
+            { backgroundColor: theme.surface, borderColor: theme.cardBorder },
+          ]}
+        >
+          {/* Header of Receipt */}
+          <View
+            style={[
+              styles.receiptHeader,
+              { borderBottomColor: isDark ? "#333" : "#e5e5e5" },
+            ]}
+          >
+            <View
+              style={[
+                styles.fuelIconWrap,
+                { backgroundColor: `${fuelTypeColor}15` },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={
+                  transaction.fuelType === "PETROL" ? "gas-station" : "fire"
+                }
+                size={28}
+                color={fuelTypeColor}
+              />
             </View>
-            <View style={[styles.badgeInline, { backgroundColor: statusInfo.bg, borderColor: statusInfo.color + "40" }]}>
-              <MaterialCommunityIcons name={statusInfo.icon} size={12} color={statusInfo.color} />
-              <Text style={[styles.badgeInlineText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
+            <Text style={[styles.heroFuelLabel, { color: theme.subText }]}>
+              {transaction.fuelType?.toUpperCase() ?? "FUEL"}
+            </Text>
+            <Text style={[styles.heroAmount, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit>
+              Rs. {calcTotalAmount?.toFixed(2) ?? "0.00"}
+            </Text>
+            <View style={[styles.qtyBadge, { backgroundColor: theme.bg }]}>
+              <Text style={[styles.qtyBadgeText, { color: theme.primary }]}>
+                {transaction.quantity?.toFixed(2) ?? "0.00"}L @ Rs.{" "}
+                {Number(finalUnitPrice).toFixed(2)}/L
+              </Text>
             </View>
           </View>
 
-          {transaction.customer && (
-            <>
-              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>CUSTOMER INFO</Text>
-              <Row icon="account-outline" label="Name" value={transaction.customer.name ?? "—"} />
-              {transaction.customer.phone && (
-                <Row icon="phone-outline" label="Phone" value={transaction.customer.phone} />
-              )}
-            </>
-          )}
+          {/* Details Section */}
+          <View style={styles.receiptBody}>
+            <Text style={[styles.sectionTitle, { color: theme.subText }]}>
+              TRANSACTION DETAILS
+            </Text>
+            <Row
+              icon="identifier"
+              label="ID Number"
+              value={transaction.transactionNo ?? "—"}
+            />
+            <Row
+              icon="calendar-clock-outline"
+              label="Date & Time"
+              value={formatDate(transaction.createdAt)}
+            />
 
-          {transaction.notes && (
-            <>
-              <Text style={[styles.listSectionTitle, { color: theme.subText, marginTop: 24 }]}>NOTES</Text>
-              <Text style={[styles.notesText, { color: theme.text }]}>{transaction.notes}</Text>
-            </>
-          )}
+            <View style={[styles.statusRow]}>
+              <View style={styles.rowLeft}>
+                <MaterialCommunityIcons
+                  name="shield-check-outline"
+                  size={18}
+                  color={theme.subText}
+                />
+                <Text style={[styles.rowLabel, { color: theme.subText }]}>
+                  Payment
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: `${theme.success}15`,
+                    borderColor: `${theme.success}30`,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.statusBadgeText, { color: theme.success }]}
+                >
+                  {transaction.status ?? "—"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.statusRow]}>
+              <View style={styles.rowLeft}>
+                <MaterialCommunityIcons
+                  name="gas-station-outline"
+                  size={18}
+                  color={theme.subText}
+                />
+                <Text style={[styles.rowLabel, { color: theme.subText }]}>
+                  Fuel Status
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: statusInfo.bg,
+                    borderColor: statusInfo.color + "40",
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={statusInfo.icon}
+                  size={12}
+                  color={statusInfo.color}
+                />
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    { color: statusInfo.color, marginLeft: 4 },
+                  ]}
+                >
+                  {statusInfo.label}
+                </Text>
+              </View>
+            </View>
+
+            {transaction.customer && (
+              <>
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: isDark ? "#333" : "#e5e5e5" },
+                  ]}
+                />
+                <Text style={[styles.sectionTitle, { color: theme.subText }]}>
+                  CUSTOMER INFO
+                </Text>
+                <Row
+                  icon="account-circle-outline"
+                  label="Name"
+                  value={transaction.customer.name ?? "—"}
+                />
+                {transaction.customer.phone && (
+                  <Row
+                    icon="phone-outline"
+                    label="Phone"
+                    value={transaction.customer.phone}
+                  />
+                )}
+              </>
+            )}
+
+            {transaction.notes && (
+              <>
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: isDark ? "#333" : "#e5e5e5" },
+                  ]}
+                />
+                <Text style={[styles.sectionTitle, { color: theme.subText }]}>
+                  NOTES
+                </Text>
+                <Text style={[styles.notesText, { color: theme.text }]}>
+                  {transaction.notes}
+                </Text>
+              </>
+            )}
+          </View>
         </View>
 
         {/* Error Banner */}
         {errorMsg && (
-          <View style={[styles.errorBanner, { backgroundColor: `${theme.danger}15`, borderColor: `${theme.danger}40` }]}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={theme.danger} />
-            <Text style={[styles.errorText, { color: theme.danger }]}>{errorMsg}</Text>
-            <TouchableOpacity onPress={() => setErrorMsg(null)}>
-              <MaterialCommunityIcons name="close" size={16} color={theme.danger} />
+          <View
+            style={[
+              styles.errorBanner,
+              {
+                backgroundColor: `${theme.danger}15`,
+                borderColor: `${theme.danger}40`,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="alert-circle-outline"
+              size={20}
+              color={theme.danger}
+            />
+            <Text style={[styles.errorText, { color: theme.danger }]}>
+              {errorMsg}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setErrorMsg(null)}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              <MaterialCommunityIcons
+                name="close"
+                size={18}
+                color={theme.danger}
+              />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Inline Confirm: Fill */}
-        {isConfirmingFill && (
-          <View style={[styles.confirmCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-            <MaterialCommunityIcons name="gas-station" size={24} color={theme.primary} />
-            <Text style={[styles.confirmTitle, { color: theme.text }]}>Confirm Fuel Dispensed</Text>
-            <Text style={[styles.confirmDesc, { color: theme.subText }]}>
-              Mark{" "}
-              <Text style={{ color: theme.text, fontWeight: "700" }}>
-                {transaction.quantity?.toFixed(2)}L {transaction.fuelType}
-              </Text>{" "}
-              as filled for{" "}
-              <Text style={{ color: theme.text, fontWeight: "700" }}>
-                {transaction.customer?.name ?? "this customer"}
+        {/* Action Area */}
+        <View style={styles.actionArea}>
+          {isConfirmingFill && (
+            <View
+              style={[
+                styles.confirmWrap,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.confirmIconWrap,
+                  { backgroundColor: `${theme.primary}15` },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="gas-station-outline"
+                  size={24}
+                  color={theme.primary}
+                />
+              </View>
+              <Text style={[styles.confirmTitle, { color: theme.text }]}>
+                Confirm Fuel Dispense
               </Text>
-              ?
-            </Text>
-            <View style={styles.confirmBtns}>
-              <TouchableOpacity
-                style={[styles.confirmCancelBtn, { backgroundColor: theme.bg, borderColor: theme.border }]}
-                onPress={() => setConfirmAction(null)}
-              >
-                <Text style={[styles.confirmCancelText, { color: theme.subText }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmOkBtn, { backgroundColor: theme.primary }]}
-                onPress={() => void doMarkFilled()}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.confirmOkText}>Yes, Mark Filled</Text>
-                )}
-              </TouchableOpacity>
+              <Text style={[styles.confirmDesc, { color: theme.subText }]}>
+                Mark{" "}
+                <Text style={{ color: theme.text, fontWeight: "700" }}>
+                  {transaction.quantity?.toFixed(2)}L {transaction.fuelType}
+                </Text>{" "}
+                as successfully filled?
+              </Text>
+              <View style={styles.confirmBtns}>
+                <TouchableOpacity
+                  style={[styles.btnOutline, { borderColor: theme.border }]}
+                  onPress={() => setConfirmAction(null)}
+                >
+                  <Text style={[styles.btnOutlineText, { color: theme.text }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btnSolid, { backgroundColor: theme.primary }]}
+                  onPress={() => void doMarkFilled()}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.btnSolidText}>Confirm Fill</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Action Buttons */}
-        <View style={styles.actions}>
           {isNotFilled && !isConfirmingFill && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+              style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
               onPress={() => setConfirmAction("fill")}
+              activeOpacity={0.85}
               disabled={isLoading}
-              activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="gas-station" size={20} color="#fff" />
-              <Text style={styles.actionBtnText}>Mark as Filled</Text>
+              <MaterialCommunityIcons
+                name="water-pump"
+                size={22}
+                color="#fff"
+              />
+              <Text style={styles.primaryBtnText}>Dispense Fuel</Text>
             </TouchableOpacity>
           )}
 
           {isFilled && (
-            <View style={[styles.filledBox, { backgroundColor: `${theme.success}10`, borderColor: `${theme.success}30` }]}>
-              <MaterialCommunityIcons name="check-circle-outline" size={20} color={theme.success} />
-              <Text style={[styles.filledText, { color: theme.success }]}>Fuel dispensed successfully</Text>
+            <View
+              style={[
+                styles.successBanner,
+                {
+                  backgroundColor: `${theme.success}15`,
+                  borderColor: `${theme.success}30`,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="check-decagram"
+                size={24}
+                color={theme.success}
+              />
+              <Text style={[styles.successText, { color: theme.success }]}>
+                Transaction Completed
+              </Text>
             </View>
           )}
 
           <TouchableOpacity
-            style={[styles.actionBtn, styles.scanAgainBtn, { borderColor: theme.primary }]}
+            style={[
+              styles.secondaryBtn,
+              { backgroundColor: theme.surface, borderColor: theme.cardBorder },
+            ]}
             onPress={() => router.replace("/(main)/scan")}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="qrcode-scan" size={20} color={theme.primary} />
-            <Text style={[styles.actionBtnText, { color: theme.primary }]}>Scan Another</Text>
+            <MaterialCommunityIcons
+              name="qrcode-scan"
+              size={20}
+              color={theme.text}
+            />
+            <Text style={[styles.secondaryBtnText, { color: theme.text }]}>
+              Scan Next QR
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -352,198 +559,262 @@ export default function TransactionDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 32, gap: 12 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
 
-  /* header */
+  /* Header */
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  headerSub: { fontSize: 12, textAlign: "center" },
-
-  /* Main Hero */
-  heroSection: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 28,
+    paddingVertical: 12,
     marginBottom: 8,
   },
-  heroFuelType: {
-    flexDirection: "row",
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: "center",
-    gap: 6,
-    marginBottom: 12,
+    justifyContent: "center",
+    borderWidth: 1,
   },
-  heroFuelLabel: {
-    fontSize: 16,
+  headerTitle: {
+    fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
-  heroAmount: {
-    fontSize: 42,
-    fontWeight: "800",
+
+  /* Receipt Card */
+  receiptCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  receiptHeader: {
+    alignItems: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1.5,
+    borderStyle: "dashed",
+  },
+  fuelIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  heroFuelLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 2,
     marginBottom: 8,
   },
-  heroQty: {
-    fontSize: 15,
-    fontWeight: "500",
+  heroAmount: {
+    fontSize: 34,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  qtyBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  qtyBadgeText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 
-  /* Details List */
-  detailsList: {
-    marginBottom: 32,
-    paddingHorizontal: 8,
+  receiptBody: {
+    padding: 24,
   },
-  listSectionTitle: {
+  sectionTitle: {
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1,
     marginBottom: 16,
-    marginLeft: 4,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
+    marginBottom: 16,
   },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
+    marginBottom: 16,
   },
-  rowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  rowLabel: { fontSize: 14, fontWeight: "500" },
+  rowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  rowLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
   rowValue: {
     fontSize: 14,
     fontWeight: "600",
-    maxWidth: "50%",
     textAlign: "right",
+    flex: 1,
+    marginLeft: 20,
   },
-  badgeInline: {
+  statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
     borderWidth: 1,
   },
-  badgeInlineText: {
-    fontSize: 11,
+  statusBadgeText: {
+    fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  divider: {
+    height: 1,
+    marginVertical: 12,
+    marginBottom: 20,
   },
   notesText: {
     fontSize: 14,
     lineHeight: 22,
-    paddingHorizontal: 4,
+    fontStyle: "italic",
+    opacity: 0.9,
   },
 
-  /* error banner */
+  /* Error Banner */
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-  },
-  errorText: { flex: 1, fontSize: 13 },
-
-  /* confirm card */
-  confirmCard: {
+    gap: 12,
+    padding: 16,
     borderRadius: 16,
-    padding: 20,
     borderWidth: 1,
-    gap: 10,
+    marginBottom: 20,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  /* Action Area */
+  actionArea: {
+    gap: 12,
+  },
+  confirmWrap: {
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: "center",
+    marginBottom: 8,
+  },
+  confirmIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
   confirmTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    textAlign: "center",
+    marginBottom: 8,
   },
   confirmDesc: {
-    fontSize: 13,
+    fontSize: 14,
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22,
+    marginBottom: 24,
+    paddingHorizontal: 10,
   },
   confirmBtns: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
     width: "100%",
   },
-  confirmCancelBtn: {
+  btnOutline: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    height: 54,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
-  confirmCancelText: { fontSize: 14, fontWeight: "600" },
-  confirmOkBtn: {
+  btnOutlineText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  btnSolid: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    height: 54,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  confirmOkText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  btnSolidText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
+  },
 
-  /* actions */
-  actions: { gap: 10, marginTop: 4 },
-  actionBtn: {
+  primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    borderRadius: 14,
-    height: 54,
+    height: 60,
+    borderRadius: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  scanAgainBtn: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
+  primaryBtnText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#fff",
+    letterSpacing: 0.5,
   },
-  actionBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
-
-  /* filled — final state */
-  filledBox: {
+  secondaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    borderRadius: 14,
-    height: 54,
-    borderWidth: 1,
+    gap: 10,
+    height: 60,
+    borderRadius: 18,
+    borderWidth: 1.5,
   },
-  filledText: { fontWeight: "600", fontSize: 14 },
+  secondaryBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  successBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    height: 60,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  successText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
