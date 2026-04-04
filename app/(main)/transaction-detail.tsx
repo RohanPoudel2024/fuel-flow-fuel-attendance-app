@@ -272,7 +272,11 @@ export default function TransactionDetailScreen() {
             <Text style={[styles.heroFuelLabel, { color: theme.subText }]}>
               {transaction.fuelType?.toUpperCase() ?? "FUEL"}
             </Text>
-            <Text style={[styles.heroAmount, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text
+              style={[styles.heroAmount, { color: theme.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               Rs. {calcTotalAmount?.toFixed(2) ?? "0.00"}
             </Text>
             <View style={[styles.qtyBadge, { backgroundColor: theme.bg }]}>
