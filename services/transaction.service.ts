@@ -55,9 +55,12 @@ export const transactionService = {
   },
 
   async verifyQrToken(token: string): Promise<FuelTransaction> {
-    const response = await api.post<FuelTransaction>("/fuel-transaction/verify-qr", {
-      token,
-    });
+    const response = await api.post<FuelTransaction>(
+      "/fuel-transaction/verify-qr",
+      {
+        token,
+      },
+    );
     return response.data;
   },
 
