@@ -109,4 +109,41 @@ export const authService = {
       return null;
     }
   },
+
+  async fetchCurrentUser(): Promise<StationUser | null> {
+    const cached = await authService.getUser();
+    const response = await api.get<Record<string, unknown>>("/auth/me");
+    const data = response.data;
+    const updated: StationUser = {
+      id: data.id as string,
+      email: data.email as string,
+      name: data.name as string,
+      phone: data.phone as string | undefined,
+      userType: data.userType as "STATION_ADMIN" | "STATION_STAFF",
+      avatarUrl: data.avatarUrl as string | undefined,
+      staffRole: data.staffRole as string | undefined,
+      station: (data.station as StationUser["station"]) ?? null,
+      staffProfileId: cached?.staffProfileId ?? null,
+    };
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated));
+    return updated;
+  },
+
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await api.post("/auth/change-password", { oldPassword, newPassword });
+  },
+
+  async uploadAvatar(imageUri: string, mimeType: string): Promise<string> {
+    const form = new FormData();
+    form.append("file", { uri: imageUri, type: mimeType, name: "avatar.jpg" } as unknown as Blob);
+    const response = await api.post<{ avatarUrl: string }>("/upload/profile-image", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const url = response.data.avatarUrl;
+    const current = await authService.getUser();
+    if (current) {
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify({ ...current, avatarUrl: url }));
+    }
+    return url;
+  },
 };
