@@ -20,6 +20,66 @@ import { authService, type StationUser } from "../../services/auth.service";
 import { transactionService } from "../../services/transaction.service";
 import { useTheme } from "../../context/theme-context";
 
+type QrErrorType =
+  | "EXPIRED"
+  | "ALREADY_USED"
+  | "SCAN_LIMIT"
+  | "VOIDED"
+  | "INVALID"
+  | "WRONG_STATION"
+  | "GENERIC";
+
+interface ScanErrorState {
+  type: QrErrorType;
+  title: string;
+  message: string;
+}
+
+function mapQrError(rawMessage: string): ScanErrorState {
+  const msg = rawMessage.toLowerCase();
+  if (msg.includes("expired"))
+    return {
+      type: "EXPIRED",
+      title: "QR Code Expired",
+      message: "This QR code has expired. Ask the customer to generate a new receipt.",
+    };
+  if (msg.includes("already been used"))
+    return {
+      type: "ALREADY_USED",
+      title: "Already Filled",
+      message: "This QR code was already used for a fuel fill.",
+    };
+  if (msg.includes("scan limit"))
+    return {
+      type: "SCAN_LIMIT",
+      title: "Scan Limit Reached",
+      message: "This QR code has been scanned too many times.",
+    };
+  if (msg.includes("voided"))
+    return {
+      type: "VOIDED",
+      title: "Receipt Voided",
+      message: "This payment receipt has been voided and cannot be redeemed.",
+    };
+  if (msg.includes("invalid qr"))
+    return {
+      type: "INVALID",
+      title: "Invalid QR Code",
+      message: "This QR code is not recognized by the system.",
+    };
+  return { type: "GENERIC", title: "Scan Error", message: rawMessage };
+}
+
+const QR_ERROR_ICON: Record<QrErrorType, string> = {
+  EXPIRED: "clock-alert-outline",
+  ALREADY_USED: "check-circle-outline",
+  SCAN_LIMIT: "counter",
+  VOIDED: "cancel",
+  WRONG_STATION: "map-marker-off-outline",
+  INVALID: "alert-circle-outline",
+  GENERIC: "alert-circle-outline",
+};
+
 export default function ScanScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
@@ -28,7 +88,7 @@ export default function ScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<ScanErrorState | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const [showQrModal, setShowQrModal] = useState(false);
   const [liveStationImageUrl, setLiveStationImageUrl] = useState<string | null>(null);
@@ -120,6 +180,7 @@ export default function ScanScreen() {
 
     setScanned(true);
     Vibration.vibrate(100);
+    setScanError(null);
 
     let transactionNo: string;
     try {
@@ -130,15 +191,36 @@ export default function ScanScreen() {
     }
 
     if (!transactionNo) {
-      setScanError("This QR code does not contain a valid transaction.");
+      setScanError({
+        type: "INVALID",
+        title: "Invalid QR Code",
+        message: "This QR code does not contain a valid transaction.",
+      });
       setScanned(false);
       return;
     }
 
     try {
       setIsProcessing(true);
-      const transaction =
-        await transactionService.getTransaction(transactionNo);
+      const transaction = await transactionService.getTransaction(transactionNo);
+
+      // Station match guard
+      const myStationId = user?.station?.id;
+      if (myStationId && transaction.stationId && transaction.stationId !== myStationId) {
+        setScanError({
+          type: "WRONG_STATION",
+          title: "Wrong Station",
+          message: "This QR code belongs to a different station.",
+        });
+        setScanned(false);
+        return;
+      }
+
+      // QR token pre-validation
+      const qrToken = transaction.paymentReceipts?.[0]?.qrVerificationToken;
+      if (qrToken) {
+        await transactionService.verifyQrToken(qrToken);
+      }
 
       router.push({
         pathname: "/(main)/transaction-detail",
@@ -152,13 +234,13 @@ export default function ScanScreen() {
         response?: { status?: number; data?: { message?: string } };
       };
       const status = axiosError.response?.status;
-      const message =
+      const rawMessage =
         status === 404
           ? "Transaction not found. Please check the QR code."
-          : axiosError.response?.data?.message ||
-            "Failed to fetch transaction. Please try again.";
+          : (axiosError.response?.data?.message ??
+            "Failed to fetch transaction. Please try again.");
 
-      setScanError(message);
+      setScanError(mapQrError(rawMessage));
       setScanned(false);
     } finally {
       setIsProcessing(false);
@@ -272,7 +354,7 @@ export default function ScanScreen() {
                   size={40}
                   color={theme.primary}
                 />
-                <Text style={[styles.processingText, { color: theme.primary }]}>Fetching transaction…</Text>
+                <Text style={[styles.processingText, { color: theme.primary }]}>Validating transaction…</Text>
               </View>
             )}
           </View>
@@ -281,23 +363,39 @@ export default function ScanScreen() {
         {/* Bottom hint */}
         <View style={[styles.bottomBar, { backgroundColor: "rgba(0,0,0,0.6)" }]}>
           {scanError ? (
-            <View style={[styles.errorBanner, { backgroundColor: `${theme.danger}20`, borderColor: `${theme.danger}50` }]}>
-              <MaterialCommunityIcons
-                name="alert-circle-outline"
-                size={16}
-                color={theme.danger}
-              />
-              <Text style={[styles.errorText, { color: theme.danger }]} numberOfLines={2}>
-                {scanError}
-              </Text>
-              <TouchableOpacity onPress={() => setScanError(null)}>
-                <MaterialCommunityIcons
-                  name="close"
-                  size={14}
-                  color={theme.danger}
-                />
-              </TouchableOpacity>
-            </View>
+            (() => {
+              const errColor =
+                scanError.type === "EXPIRED"
+                  ? theme.warning
+                  : scanError.type === "ALREADY_USED"
+                    ? theme.subText
+                    : theme.danger;
+              const errIcon = QR_ERROR_ICON[scanError.type] as keyof typeof MaterialCommunityIcons.glyphMap;
+              return (
+                <View
+                  style={[
+                    styles.errorBanner,
+                    {
+                      backgroundColor: `${errColor}20`,
+                      borderColor: `${errColor}50`,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons name={errIcon} size={18} color={errColor} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[styles.errorTitle, { color: errColor }]}>
+                      {scanError.title}
+                    </Text>
+                    <Text style={[styles.errorText, { color: errColor }]} numberOfLines={2}>
+                      {scanError.message}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => { setScanError(null); setScanned(false); }}>
+                    <MaterialCommunityIcons name="close" size={14} color={errColor} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })()
           ) : (
           <TouchableOpacity
             style={[styles.dragHandleContainer, { backgroundColor: `${theme.primary}15`, borderWidth: 1, borderColor: `${theme.primary}30` }]}
@@ -571,7 +669,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     width: "100%",
   },
-  errorText: { flex: 1, fontSize: 13, fontWeight: "500" },
+  errorTitle: { fontSize: 13, fontWeight: "700" },
+  errorText: { fontSize: 12, fontWeight: "500" },
 
   /* permission */
   permTitle: {
