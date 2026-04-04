@@ -97,9 +97,11 @@ export default function TransactionDetailScreen() {
       setIsLoading(true);
       setErrorMsg(null);
       setConfirmAction(null);
+      const qrToken = transaction.paymentReceipts?.[0]?.qrVerificationToken;
       const updated = await transactionService.markFilled(
         transaction.id,
         staffId,
+        qrToken,
       );
       setTransaction(updated);
       const filledAt = new Date().toISOString();
