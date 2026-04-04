@@ -49,6 +49,8 @@ export interface StationUser {
   name: string;
   phone?: string;
   userType: "STATION_ADMIN" | "STATION_STAFF";
+  avatarUrl?: string;
+  staffRole?: string;
   station: {
     id: string;
     name: string;

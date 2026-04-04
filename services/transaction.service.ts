@@ -21,12 +21,14 @@ api.interceptors.request.use(async (config) => {
 export interface FuelTransaction {
   id: string;
   transactionNo: string;
+  stationId?: string;
   fuelType: string;
   quantity: number;
   pricePerLiter: number;
   totalAmount: number;
   status: string;
   fuelFilledStatus: "NOT_FILLED" | "FILLED";
+  isVoid?: boolean;
   notes?: string;
   createdAt: string;
   customer?: {
@@ -45,6 +47,7 @@ export interface FuelTransaction {
     qrCode?: string;
     qrVerificationToken?: string;
     qrExpiresAt?: string;
+    isVoid?: boolean;
   }[];
 }
 
