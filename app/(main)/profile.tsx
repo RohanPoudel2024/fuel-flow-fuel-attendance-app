@@ -8,11 +8,15 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Image,
+  TextInput,
+  Alert,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { authService, type StationUser } from "../../services/auth.service";
 import { API_URL } from "../../config/api.config";
 import { useTheme } from "../../context/theme-context";
@@ -44,11 +48,26 @@ export default function ProfileScreen() {
   const [ratingsLoading, setRatingsLoading] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("Account");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  // change-password form state
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [cpOld, setCpOld] = useState("");
+  const [cpNew, setCpNew] = useState("");
+  const [cpConfirm, setCpConfirm] = useState("");
+  const [cpLoading, setCpLoading] = useState(false);
+  const [cpError, setCpError] = useState<string | null>(null);
+  const [cpSuccess, setCpSuccess] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      const u = await authService.getUser();
-      setUser(u);
+      const cached = await authService.getUser();
+      setUser(cached);
+      try {
+        const fresh = await authService.fetchCurrentUser();
+        if (fresh) setUser(fresh);
+      } catch {
+        // network failure — keep cached data
+      }
     };
     void load();
   }, []);
@@ -56,6 +75,61 @@ export default function ProfileScreen() {
   const doLogout = async () => {
     await authService.logout();
     router.replace("/(auth)/login");
+  };
+
+  const handlePickAvatar = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Please allow access to your photo library to change your avatar.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    try {
+      setAvatarUploading(true);
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      const url = await authService.uploadAvatar(asset.uri, mimeType);
+      setUser((prev) => (prev ? { ...prev, avatarUrl: url } : prev));
+    } catch {
+      Alert.alert("Upload failed", "Could not upload avatar. Please try again.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const doChangePassword = async () => {
+    if (!cpOld || !cpNew || !cpConfirm) {
+      setCpError("All fields are required.");
+      return;
+    }
+    if (cpNew.length < 6) {
+      setCpError("New password must be at least 6 characters.");
+      return;
+    }
+    if (cpNew !== cpConfirm) {
+      setCpError("New passwords do not match.");
+      return;
+    }
+    try {
+      setCpLoading(true);
+      setCpError(null);
+      await authService.changePassword(cpOld, cpNew);
+      setCpSuccess(true);
+      setCpOld("");
+      setCpNew("");
+      setCpConfirm("");
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      setCpError(axiosError.response?.data?.message ?? "Failed to change password.");
+    } finally {
+      setCpLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -139,11 +213,24 @@ export default function ProfileScreen() {
 
   const renderAccountTab = () => (
     <View style={styles.tabContent}>
-      {/* Avatar Section goes into Account to keep things neat */}
+      {/* Avatar Section */}
       <View style={styles.avatarSection}>
-        <View style={[styles.avatar, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
-          <MaterialCommunityIcons name="account" size={48} color={theme.primary} />
-        </View>
+        <TouchableOpacity onPress={() => void handlePickAvatar()} style={styles.avatarWrap} disabled={avatarUploading}>
+          {user?.avatarUrl ? (
+            <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+              <MaterialCommunityIcons name="account" size={48} color={theme.primary} />
+            </View>
+          )}
+          <View style={[styles.avatarEditBadge, { backgroundColor: avatarUploading ? theme.subText : theme.primary }]}>
+            {avatarUploading ? (
+              <ActivityIndicator size={10} color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="camera" size={13} color="#fff" />
+            )}
+          </View>
+        </TouchableOpacity>
         <Text style={[styles.name, { color: theme.text }]}>{user?.name ?? "—"}</Text>
         <View style={[styles.roleBadge, { backgroundColor: `${roleColor}10`, borderColor: `${roleColor}40` }]}>
           <MaterialCommunityIcons
@@ -244,6 +331,75 @@ export default function ProfileScreen() {
 
   const renderSettingsTab = () => (
     <View style={styles.tabContent}>
+      {/* Security */}
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+        <Text style={[styles.cardTitle, { color: theme.subText }]}>Security</Text>
+        {showChangePassword ? (
+          <View style={{ gap: 10 }}>
+            {cpSuccess ? (
+              <View style={[styles.cpSuccessBanner, { backgroundColor: `${theme.success}15`, borderColor: `${theme.success}40` }]}>
+                <MaterialCommunityIcons name="check-circle-outline" size={18} color={theme.success} />
+                <Text style={[styles.cpSuccessText, { color: theme.success }]}>Password changed successfully.</Text>
+              </View>
+            ) : null}
+            <TextInput
+              style={[styles.cpInput, { backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }]}
+              placeholder="Current password"
+              placeholderTextColor={theme.subText}
+              secureTextEntry
+              value={cpOld}
+              onChangeText={(v) => { setCpOld(v); setCpError(null); setCpSuccess(false); }}
+            />
+            <TextInput
+              style={[styles.cpInput, { backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }]}
+              placeholder="New password (min 6 chars)"
+              placeholderTextColor={theme.subText}
+              secureTextEntry
+              value={cpNew}
+              onChangeText={(v) => { setCpNew(v); setCpError(null); setCpSuccess(false); }}
+            />
+            <TextInput
+              style={[styles.cpInput, { backgroundColor: theme.bg, borderColor: theme.border, color: theme.text }]}
+              placeholder="Confirm new password"
+              placeholderTextColor={theme.subText}
+              secureTextEntry
+              value={cpConfirm}
+              onChangeText={(v) => { setCpConfirm(v); setCpError(null); setCpSuccess(false); }}
+            />
+            {cpError ? (
+              <Text style={[styles.cpError, { color: theme.danger }]}>{cpError}</Text>
+            ) : null}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity
+                style={[styles.cpBtn, { backgroundColor: theme.bg, borderColor: theme.border, flex: 1 }]}
+                onPress={() => { setShowChangePassword(false); setCpOld(""); setCpNew(""); setCpConfirm(""); setCpError(null); setCpSuccess(false); }}
+              >
+                <Text style={[styles.cpBtnText, { color: theme.subText }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cpBtn, { backgroundColor: theme.primary, flex: 1 }]}
+                onPress={() => void doChangePassword()}
+                disabled={cpLoading}
+              >
+                {cpLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.cpBtnText, { color: "#fff" }]}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.actionRow} onPress={() => { setShowChangePassword(true); setCpSuccess(false); }}>
+            <View style={[styles.actionIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <MaterialCommunityIcons name="lock-outline" size={20} color={theme.primary} />
+            </View>
+            <Text style={[styles.actionText, { color: theme.text }]}>Change Password</Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
         <Text style={[styles.cardTitle, { color: theme.subText }]}>Appearance</Text>
         <TouchableOpacity style={styles.actionRow} onPress={toggleTheme}>
@@ -426,6 +582,13 @@ const styles = StyleSheet.create({
 
   /* avatar */
   avatarSection: { alignItems: "center", paddingVertical: 16, gap: 10 },
+  avatarWrap: { position: "relative" },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 30,
+    resizeMode: "cover",
+  },
   avatar: {
     width: 90,
     height: 90,
@@ -433,6 +596,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   name: { fontSize: 22, fontWeight: "700" },
   roleBadge: {
@@ -561,6 +736,33 @@ const styles = StyleSheet.create({
   reviewRow: { borderTopWidth: 1, paddingTop: 8, marginTop: 6 },
   reviewName: { fontSize: 12, fontWeight: "600" },
   reviewComment: { fontSize: 12, marginTop: 2 },
+
+  /* change password */
+  cpInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+  },
+  cpError: { fontSize: 13, fontWeight: "500" },
+  cpBtn: {
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  cpBtnText: { fontSize: 14, fontWeight: "700" },
+  cpSuccessBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  cpSuccessText: { fontSize: 13, fontWeight: "600", flex: 1 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
