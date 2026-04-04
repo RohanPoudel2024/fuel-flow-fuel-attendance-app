@@ -136,7 +136,8 @@ export default function TransactionDetailScreen() {
   };
 
   const filledStatus = transaction.fuelFilledStatus ?? "NOT_FILLED";
-  const isNotFilled = filledStatus === "NOT_FILLED";
+  const isVoided = !!transaction.isVoid;
+  const isNotFilled = filledStatus === "NOT_FILLED" && !isVoided;
   const isFilled = filledStatus === "FILLED";
   const isConfirmingFill = confirmAction === "fill";
 
@@ -155,6 +156,12 @@ export default function TransactionDetailScreen() {
       color: theme.success,
       bg: `${theme.success}15`,
       icon: "check-circle-outline",
+    },
+    VOID: {
+      label: "Voided",
+      color: theme.danger,
+      bg: `${theme.danger}15`,
+      icon: "cancel",
     },
   };
 
@@ -446,6 +453,31 @@ export default function TransactionDetailScreen() {
 
         {/* Action Area */}
         <View style={styles.actionArea}>
+          {isVoided && (
+            <View
+              style={[
+                styles.voidBanner,
+                {
+                  backgroundColor: `${theme.danger}15`,
+                  borderColor: `${theme.danger}40`,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="cancel"
+                size={24}
+                color={theme.danger}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.voidBannerTitle, { color: theme.danger }]}>
+                  Receipt Voided
+                </Text>
+                <Text style={[styles.voidBannerDesc, { color: theme.danger }]}>
+                  This receipt has been voided and cannot be used for fuel dispensing.
+                </Text>
+              </View>
+            </View>
+          )}
           {isConfirmingFill && (
             <View
               style={[
@@ -822,5 +854,24 @@ const styles = StyleSheet.create({
   successText: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  voidBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  voidBannerTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  voidBannerDesc: {
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 18,
   },
 });

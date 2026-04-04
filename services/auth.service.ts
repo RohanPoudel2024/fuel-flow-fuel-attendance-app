@@ -49,6 +49,8 @@ export interface StationUser {
   name: string;
   phone?: string;
   userType: "STATION_ADMIN" | "STATION_STAFF";
+  avatarUrl?: string;
+  staffRole?: string;
   station: {
     id: string;
     name: string;
@@ -99,12 +101,75 @@ export const authService = {
     return !!token;
   },
 
-  async getStation(stationId: string): Promise<{ profileImageUrl?: string; name?: string } | null> {
+  async getStation(
+    stationId: string,
+  ): Promise<{ profileImageUrl?: string; name?: string } | null> {
     try {
-      const response = await api.get<{ profileImageUrl?: string; name?: string }>(`/station/${stationId}`);
+      const response = await api.get<{
+        profileImageUrl?: string;
+        name?: string;
+      }>(`/station/${stationId}`);
       return response.data;
     } catch {
       return null;
     }
+  },
+
+  async fetchCurrentUser(): Promise<StationUser | null> {
+    const cached = await authService.getUser();
+    const response = await api.get<Record<string, unknown>>("/auth/me");
+    const data = response.data;
+    const updated: StationUser = {
+      id: data.id as string,
+      email: data.email as string,
+      name: data.name as string,
+      phone: data.phone as string | undefined,
+      userType: data.userType as "STATION_ADMIN" | "STATION_STAFF",
+      avatarUrl: data.avatarUrl as string | undefined,
+      staffRole: data.staffRole as string | undefined,
+      station: (data.station as StationUser["station"]) ?? null,
+      staffProfileId: cached?.staffProfileId ?? null,
+    };
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated));
+    return updated;
+  },
+
+  async changePassword(
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    await api.post("/auth/change-password", { oldPassword, newPassword });
+  },
+
+  async uploadAvatar(imageUri: string, mimeType: string): Promise<string> {
+    // Use fetch (not axios) so React Native can inject the correct
+    // multipart/form-data boundary automatically. Passing the header
+    // manually via axios strips the boundary and the server rejects it.
+    const token = await authService.getToken();
+    const form = new FormData();
+    form.append("file", {
+      uri: imageUri,
+      type: mimeType,
+      name: "avatar.jpg",
+    } as unknown as Blob);
+    const res = await fetch(`${API_URL}/upload/profile-image`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const errData = (await res.json()) as { message?: string };
+      throw new Error(errData.message ?? `Upload failed (${res.status})`);
+    }
+    const data = (await res.json()) as { avatarUrl: string };
+    const url = data.avatarUrl;
+    const current = await authService.getUser();
+    if (current) {
+      await AsyncStorage.setItem(
+        USER_KEY,
+        JSON.stringify({ ...current, avatarUrl: url }),
+      );
+    }
+    return url;
   },
 };
