@@ -43,6 +43,8 @@ export interface FuelTransaction {
   paymentReceipts?: {
     receiptNo: string;
     qrCode?: string;
+    qrVerificationToken?: string;
+    qrExpiresAt?: string;
   }[];
 }
 
@@ -52,15 +54,24 @@ export const transactionService = {
     return response.data;
   },
 
+  async verifyQrToken(token: string): Promise<FuelTransaction> {
+    const response = await api.post<FuelTransaction>("/fuel-transaction/verify-qr", {
+      token,
+    });
+    return response.data;
+  },
+
   async markFilled(
     transactionId: string,
     staffProfileId: string,
+    qrToken?: string,
   ): Promise<FuelTransaction> {
     const response = await api.patch<FuelTransaction>(
       `/fuel-transaction/${transactionId}/fill-status`,
       {
         filledBy: staffProfileId,
         filledAt: new Date().toISOString(),
+        qrVerificationToken: qrToken,
       },
     );
     return response.data;
