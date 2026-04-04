@@ -101,9 +101,14 @@ export const authService = {
     return !!token;
   },
 
-  async getStation(stationId: string): Promise<{ profileImageUrl?: string; name?: string } | null> {
+  async getStation(
+    stationId: string,
+  ): Promise<{ profileImageUrl?: string; name?: string } | null> {
     try {
-      const response = await api.get<{ profileImageUrl?: string; name?: string }>(`/station/${stationId}`);
+      const response = await api.get<{
+        profileImageUrl?: string;
+        name?: string;
+      }>(`/station/${stationId}`);
       return response.data;
     } catch {
       return null;
@@ -129,20 +134,41 @@ export const authService = {
     return updated;
   },
 
-  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  async changePassword(
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<void> {
     await api.post("/auth/change-password", { oldPassword, newPassword });
   },
 
   async uploadAvatar(imageUri: string, mimeType: string): Promise<string> {
+    // Use fetch (not axios) so React Native can inject the correct
+    // multipart/form-data boundary automatically. Passing the header
+    // manually via axios strips the boundary and the server rejects it.
+    const token = await authService.getToken();
     const form = new FormData();
-    form.append("file", { uri: imageUri, type: mimeType, name: "avatar.jpg" } as unknown as Blob);
-    const response = await api.post<{ avatarUrl: string }>("/upload/profile-image", form, {
-      headers: { "Content-Type": "multipart/form-data" },
+    form.append("file", {
+      uri: imageUri,
+      type: mimeType,
+      name: "avatar.jpg",
+    } as unknown as Blob);
+    const res = await fetch(`${API_URL}/upload/profile-image`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
     });
-    const url = response.data.avatarUrl;
+    if (!res.ok) {
+      const errData = (await res.json()) as { message?: string };
+      throw new Error(errData.message ?? `Upload failed (${res.status})`);
+    }
+    const data = (await res.json()) as { avatarUrl: string };
+    const url = data.avatarUrl;
     const current = await authService.getUser();
     if (current) {
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify({ ...current, avatarUrl: url }));
+      await AsyncStorage.setItem(
+        USER_KEY,
+        JSON.stringify({ ...current, avatarUrl: url }),
+      );
     }
     return url;
   },
