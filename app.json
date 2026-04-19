@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fuelflow.rohan.dev.attendance"
     },
     "android": {
       "package": "com.fuelflow.rohan.dev.attendance",
@@ -43,7 +44,6 @@
           }
         }
       ],
-      "expo-barcode-scanner",
       [
         "expo-camera",
         {
