@@ -7,10 +7,12 @@
     "icon": "./assets/images/icon.png",
     "scheme": "fuelflowfuelattendance",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.fuelflow.rohan.dev.attendance",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -48,6 +50,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9b7cf02e-fa73-41fc-a082-4ed163bed1e2"
+      }
     }
   }
 }
