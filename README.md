@@ -1,50 +1,148 @@
-# Welcome to your Expo app 
+# Fuel Flow – Fuel Attendance App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The Fuel Flow Attendance App is a React Native (Expo) mobile application designed for Station Staff (Fuel Boys and Counter Boys) working at registered Fuel Flow partner stations. It allows attendants to log into their assigned shifts, generate dynamic QR codes for customer fuel purchases, and mark transaction completion after fuel is physically dispensed.
 
-## Get started
+---
 
-1. Install dependencies
+# Project Objective
 
+The objective of this application is to equip on-ground station employees with a lightweight, fast, and simple mobile interface optimized for operational workflows. Attendants log into the system, view their active shift details, generate unique per-transaction QR codes for customers to scan, and confirm physical fuel dispensal — bridging the digital wallet transaction with the real-world pump delivery.
+
+---
+
+# Features
+
+- Staff login with JWT token-based authentication
+- View active shift assignment and duty schedule
+- Generate dynamic QR codes for customer fuel transactions
+- Confirm fuel has been physically dispensed (mark as filled)
+- View today's completed and pending transaction list
+- Station-specific session scoping (staff can only view their station)
+- Secure logout and session management
+
+---
+
+# Technologies Used
+
+### Framework & Language
+- React Native (Expo SDK 54)
+- TypeScript
+- Expo Router (File-based routing)
+
+### UI & Navigation
+- React Navigation (Bottom Tabs, Stack Navigator)
+- Expo Vector Icons
+- React Native Reanimated (Animations)
+- React Native Gesture Handler
+
+### QR Code
+- react-native-qrcode-svg (Dynamic QR generation)
+- react-native-svg (SVG rendering support)
+
+### Data & Networking
+- Axios (API HTTP requests)
+- AsyncStorage (Local token persistence)
+
+### Device Features
+- Expo Camera (QR scanning if needed)
+- Expo Image Picker (Profile photo)
+- Expo Web Browser (External links)
+
+---
+
+# System Requirements
+
+### Hardware
+- Android smartphone (Android 8.0+) or iOS device (iOS 13+)
+- Active internet connection (Wi-Fi or Mobile Data)
+
+### Software
+- Node.js v18 or higher
+- Expo CLI
+- Android Studio (for Android emulator) or Xcode (for iOS simulator)
+
+---
+
+# Installation and Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/fuel-flow-fuel-attendance.git
+   ```
+
+2. **Navigate to the project folder:**
+   ```bash
+   cd fuel-flow-fuel-attendance
+   ```
+
+3. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. Start the app
+4. **Set up environment variables:**
+   ```bash
+   # Create a .env file and add:
+   # API_BASE_URL=http://your-api-server:3000
+   ```
 
+5. **Start the development server:**
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+6. **Run on device/emulator:**
+   - Press `a` for Android emulator
+   - Press `i` for iOS simulator
+   - Scan QR with the Expo Go app on a real device
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+# Project Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+fuel-flow-fuel-attendance/
+├── app/                    # Expo Router screen files
+│   ├── (auth)/             # Staff Login screen
+│   └── (tabs)/             # Home (shift info), QR Generator, Transactions
+├── components/             # Reusable UI components (QR display, transaction cards)
+├── services/               # API service functions (auth, transactions)
+├── hooks/                  # Custom React hooks
+├── constants/              # API base URLs, theme colors
+├── context/                # Auth context (token/user state)
+├── assets/                 # Fonts and static images
+├── app.json                # Expo app configuration
+└── package.json
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+# Screenshots
 
-To learn more about developing your project with Expo, look at the following resources:
+- Staff Login screen
+- Active Shift details screen
+- QR Code generation screen (showing the dynamic QR for a customer)
+- Today's Transaction list screen
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+# Future Improvements
 
-Join our community of developers creating universal apps.
+- Offline mode with queued QR validation on reconnect
+- Biometric login (fingerprint/face) for faster attendance
+- Shift performance statistics for individual attendants
+- Direct in-app messaging with Station Admin
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+
+# Authors
+
+- **Student Name:** Rohan Poudel
+- **Project:** Final Year Project — Fuel Flow System
+- **Program:** Computer Science / Information Technology
+
+---
+
+# License
+
+This project is created for educational purposes as part of a Final Year Project.
