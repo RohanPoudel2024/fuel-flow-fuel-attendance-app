@@ -39,7 +39,7 @@ export default function ForgotPasswordScreen() {
             text: "Continue",
             onPress: () =>
               router.push({
-                pathname: "/(auth)/reset-password",
+                pathname: "/(auth)/reset-password" as never,
                 params: { email: email.trim() },
               }),
           },
@@ -149,7 +149,7 @@ export default function ForgotPasswordScreen() {
               style={styles.linkBtn}
               onPress={() =>
                 router.push({
-                  pathname: "/(auth)/reset-password",
+                  pathname: "/(auth)/reset-password" as never,
                   params: { email: email.trim() },
                 })
               }
