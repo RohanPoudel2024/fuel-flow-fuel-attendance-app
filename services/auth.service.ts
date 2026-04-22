@@ -141,10 +141,19 @@ export const authService = {
     await api.post("/auth/change-password", { oldPassword, newPassword });
   },
 
+  async forgotPassword(email: string): Promise<void> {
+    await api.post("/auth/forgot-password", { email });
+  },
+
+  async resetPassword(
+    email: string,
+    otp: string,
+    newPassword: string,
+  ): Promise<void> {
+    await api.post("/auth/reset-password", { email, otp, newPassword });
+  },
+
   async uploadAvatar(imageUri: string, mimeType: string): Promise<string> {
-    // Use fetch (not axios) so React Native can inject the correct
-    // multipart/form-data boundary automatically. Passing the header
-    // manually via axios strips the boundary and the server rejects it.
     const token = await authService.getToken();
     const form = new FormData();
     form.append("file", {
